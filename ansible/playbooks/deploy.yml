@@ -1,0 +1,119 @@
+---
+- name: Deploy Application to VM
+  hosts: app_servers
+  gather_facts: yes
+  become: yes
+
+  vars:
+    container_name: "terracloud-app"
+    app_port: 80
+    health_check_retries: 10
+    health_check_delay: 10
+
+  tasks:
+    - name: Ensure Docker is installed
+      apt:
+        name: 
+          - docker.io
+          - docker-compose
+        state: present
+        update_cache: yes
+
+    - name: Ensure Docker service is running
+      systemd:
+        name: docker
+        state: started
+        enabled: yes
+
+    - name: Log in to Azure Container Registry
+      command: >
+        az acr login --name {{ acr_name }}
+      environment:
+        AZURE_CLIENT_ID: "{{ lookup('env', 'AZURE_CLIENT_ID') }}"
+        AZURE_TENANT_ID: "{{ lookup('env', 'AZURE_TENANT_ID') }}"
+        AZURE_SUBSCRIPTION_ID: "{{ lookup('env', 'AZURE_SUBSCRIPTION_ID') }}"
+      changed_when: false
+
+    - name: Pull Docker image from ACR
+      docker_image:
+        name: "{{ acr_name }}.azurecr.io/app"
+        tag: "{{ app_image_tag }}"
+        source: pull
+        force_source: yes
+      register: image_pull
+
+    - name: Stop existing container
+      docker_container:
+        name: "{{ container_name }}"
+        state: stopped
+      ignore_errors: yes
+
+    - name: Remove existing container
+      docker_container:
+        name: "{{ container_name }}"
+        state: absent
+      ignore_errors: yes
+
+    - name: Start new container
+      docker_container:
+        name: "{{ container_name }}"
+        image: "{{ acr_name }}.azurecr.io/app:{{ app_image_tag }}"
+        state: started
+        restart_policy: always
+        ports:
+          - "{{ app_port }}:80"
+        env:
+          APP_ENV: "{{ env_name }}"
+          DB_CONNECTION: "{{ lookup('env', 'DB_CONNECTION') | default('mysql') }}"
+          DB_HOST: "{{ lookup('env', 'DB_HOST') }}"
+          DB_PORT: "{{ lookup('env', 'DB_PORT') | default('3306') }}"
+          DB_DATABASE: "{{ lookup('env', 'DB_DATABASE') }}"
+          DB_USERNAME: "{{ lookup('env', 'DB_USERNAME') }}"
+          DB_PASSWORD: "{{ lookup('env', 'DB_PASSWORD') }}"
+          APP_KEY: "{{ lookup('env', 'APP_KEY') }}"
+      register: container_start
+
+    - name: Wait for container to be healthy
+      uri:
+        url: "http://localhost:{{ app_port }}/api/health"
+        status_code: 200
+      register: health_check
+      until: health_check.status == 200
+      retries: "{{ health_check_retries }}"
+      delay: "{{ health_check_delay }}"
+      failed_when: false
+
+    - name: Check if health check failed
+      fail:
+        msg: "Health check failed after {{ health_check_retries }} attempts. Rolling back..."
+      when: health_check.status != 200
+
+    - name: Run database migrations
+      command: >
+        docker exec {{ container_name }} php artisan migrate --force
+      register: migration_result
+      failed_when: false
+
+    - name: Display migration output
+      debug:
+        var: migration_result.stdout_lines
+
+  rescue:
+    - name: Rollback - find previous image
+      shell: docker images --format "{% raw %}{{.Repository}}:{{.Tag}}{% endraw %}" | grep "{{ acr_name }}.azurecr.io/app" | head -2 | tail -1
+      register: previous_image
+      ignore_errors: yes
+
+    - name: Rollback to previous version
+      docker_container:
+        name: "{{ container_name }}"
+        image: "{{ previous_image.stdout }}"
+        state: started
+        restart_policy: always
+        ports:
+          - "{{ app_port }}:80"
+      when: previous_image.stdout is defined and previous_image.stdout != ""
+
+    - name: Fail the deployment
+      fail:
+        msg: "Deployment failed and rolled back to previous version"

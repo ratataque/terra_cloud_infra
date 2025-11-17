@@ -1,0 +1,10 @@
+# Terragrunt cache
+.terragrunt-cache
+
+# Terraform state
+.terraform
+*.tfstate
+*.tfstate.backup
+
+# Terraform variables
+*.tfvars

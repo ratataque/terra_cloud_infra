@@ -1,0 +1,118 @@
+name: Terraform Plan
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'terragrunt/**'
+      - '.github/workflows/terraform-plan.yml'
+
+permissions:
+  id-token: write
+  contents: read
+  pull-requests: write
+
+env:
+  ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+  ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+  ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+  ARM_USE_OIDC: true
+
+jobs:
+  plan-qa:
+    name: Plan QA Environment
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Azure Login via OIDC
+        uses: azure/login@v1
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.5.7
+          terraform_wrapper: false
+
+      - name: Setup Terragrunt
+        run: |
+          wget -q https://github.com/gruntwork-io/terragrunt/releases/download/v0.54.0/terragrunt_linux_amd64
+          chmod +x terragrunt_linux_amd64
+          sudo mv terragrunt_linux_amd64 /usr/local/bin/terragrunt
+
+      - name: Terragrunt Plan - Shared
+        working-directory: terragrunt/shared
+        run: |
+          terragrunt plan -no-color > plan.txt
+          echo "## Shared Infrastructure Plan" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          cat plan.txt >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+      - name: Terragrunt Plan - QA IaaS
+        working-directory: terragrunt/iaas/qa
+        run: |
+          terragrunt plan -no-color > plan.txt
+          echo "## QA IaaS Environment Plan" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          cat plan.txt >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+      - name: Terragrunt Plan - QA PaaS
+        working-directory: terragrunt/paas/qa
+        run: |
+          terragrunt plan -no-color > plan.txt
+          echo "## QA PaaS Environment Plan" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          cat plan.txt >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+      - name: Comment PR with Plan
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const sharedPlan = fs.existsSync('terragrunt/shared/plan.txt') ? fs.readFileSync('terragrunt/shared/plan.txt', 'utf8') : 'No changes';
+            const qaIaasPlan = fs.existsSync('terragrunt/iaas/qa/plan.txt') ? fs.readFileSync('terragrunt/iaas/qa/plan.txt', 'utf8') : 'No changes';
+            const qaPaasPlan = fs.existsSync('terragrunt/paas/qa/plan.txt') ? fs.readFileSync('terragrunt/paas/qa/plan.txt', 'utf8') : 'No changes';
+            
+            const output = `#### Terraform Plan Results
+            
+            <details><summary>Shared Infrastructure</summary>
+            
+            \`\`\`
+            ${sharedPlan}
+            \`\`\`
+            
+            </details>
+            
+            <details><summary>QA IaaS Environment</summary>
+            
+            \`\`\`
+            ${qaIaasPlan}
+            \`\`\`
+            
+            </details>
+            
+            <details><summary>QA PaaS Environment</summary>
+            
+            \`\`\`
+            ${qaPaasPlan}
+            \`\`\`
+            
+            </details>
+            
+            *Pusher: @${{ github.actor }}, Action: \`${{ github.event_name }}\`*`;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: output
+            });

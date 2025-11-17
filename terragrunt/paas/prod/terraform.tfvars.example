@@ -1,0 +1,17 @@
+# terraform.tfvars.example
+#
+# Copy this file to 'terraform.tfvars' and fill in the values.
+
+# Database Admin Password (REQUIRED)
+# This password must meet Azure's complexity requirements:
+# 8-128 characters, containing letters from three of the following categories:
+# English uppercase letters, English lowercase letters, numbers (0-9), and non-alphanumeric characters (!, $, #, %, etc.).
+db_admin_password = "PLEASE_SET_A_COMPLEX_PASSWORD"
+
+
+# App Service Environment Variables
+# You can override non-sensitive app settings here if needed.
+app_settings = {
+  "APP_KEY" = "base64:PLEASE_GENERATE_YOUR_OWN_KEY" # Run `php artisan key:generate --show` and paste the result here
+  "APP_URL" = "https://sampleapp-prod-app.azurewebsites.net"   # Update with your app's future URL
+}

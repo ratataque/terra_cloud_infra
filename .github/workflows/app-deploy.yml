@@ -1,0 +1,114 @@
+name: Application Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        type: choice
+        options:
+          - qa
+          - prod
+      image_tag:
+        description: 'Docker image tag to deploy'
+        required: true
+        type: string
+  
+  # Can be triggered from app repo after successful build
+  repository_dispatch:
+    types: [deploy-app]
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy to ${{ github.event.inputs.environment || github.event.client_payload.environment }}
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment || github.event.client_payload.environment }}
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set environment variables
+        run: |
+          ENV_NAME="${{ github.event.inputs.environment || github.event.client_payload.environment }}"
+          IMAGE_TAG="${{ github.event.inputs.image_tag || github.event.client_payload.image_tag }}"
+          echo "ENV_NAME=$ENV_NAME" >> $GITHUB_ENV
+          echo "IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_ENV
+      
+      - name: Azure Login via OIDC
+        uses: azure/login@v1
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.5.7
+          terraform_wrapper: false
+
+      - name: Setup Terragrunt
+        run: |
+          wget -q https://github.com/gruntwork-io/terragrunt/releases/download/v0.54.0/terragrunt_linux_amd64
+          chmod +x terragrunt_linux_amd64
+          sudo mv terragrunt_linux_amd64 /usr/local/bin/terragrunt
+
+      - name: Get infrastructure outputs
+        id: infra
+        working-directory: terragrunt/iaas/${{ env.ENV_NAME }}
+        run: |
+          VM_IP=$(terragrunt output -raw vm_public_ip)
+          ACR_NAME=$(cd ../../shared && terragrunt output -raw acr_name)
+          echo "vm_ip=$VM_IP" >> $GITHUB_OUTPUT
+          echo "acr_name=$ACR_NAME" >> $GITHUB_OUTPUT
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install Ansible
+        run: |
+          pip install ansible docker
+
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+
+      - name: Deploy with Ansible
+        working-directory: ansible
+        env:
+          ANSIBLE_HOST_KEY_CHECKING: False
+          "${ENV_NAME}_VM_IP": ${{ steps.infra.outputs.vm_ip }}
+          ACR_NAME: ${{ steps.infra.outputs.acr_name }}
+          IMAGE_TAG: ${{ env.IMAGE_TAG }}
+          SSH_KEY_PATH: ~/.ssh/id_rsa
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          DB_CONNECTION: mysql
+          DB_HOST: ${{ secrets.DB_HOST }}
+          DB_PORT: ${{ secrets.DB_PORT }}
+          DB_DATABASE: ${{ secrets.DB_DATABASE }}
+          DB_USERNAME: ${{ secrets.DB_USERNAME }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          APP_KEY: ${{ secrets.APP_KEY }}
+        run: |
+          ansible-playbook -i inventories/${{ env.ENV_NAME }}.yml playbooks/deploy.yml
+
+      - name: Deployment Summary
+        run: |
+          echo "## Deployment Complete ✅" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environment**: ${{ env.ENV_NAME }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Image Tag**: ${{ env.IMAGE_TAG }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **VM IP**: ${{ steps.infra.outputs.vm_ip }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **ACR**: ${{ steps.infra.outputs.acr_name }}" >> $GITHUB_STEP_SUMMARY
