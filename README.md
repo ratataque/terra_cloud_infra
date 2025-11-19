@@ -76,6 +76,7 @@ terra_cloud_infra/
 **Workflow**: `infra-deploy.yml`
 
 **Flow**:
+
 1. Deploy shared infrastructure (ACR)
 2. Deploy QA environment
 3. Deploy Stage/PaaS environment (requires approval)
@@ -88,6 +89,7 @@ terra_cloud_infra/
 **Workflow**: `app-deploy.yml`
 
 **Flow**:
+
 1. Get infrastructure outputs (VM IP, ACR name)
 2. Run Ansible playbook
 3. Pull Docker image from ACR
@@ -143,20 +145,24 @@ echo "AZURE_SUBSCRIPTION_ID: $SUBSCRIPTION_ID"
 Create three environments with protection rules:
 
 #### QA Environment
+
 - **Name**: `qa`
 - **Protection**: None (auto-deploy)
 
-#### Stage Environment  
+#### Stage Environment
+
 - **Name**: `stage`
 - **Protection**: Required reviewers (1+)
 
 #### Prod Environment
+
 - **Name**: `prod`
 - **Protection**: Required reviewers (2+)
 
 ### 3. Configure GitHub Secrets
 
 **Repository Secrets** (all environments):
+
 ```
 AZURE_CLIENT_ID
 AZURE_TENANT_ID
@@ -165,6 +171,7 @@ SSH_PRIVATE_KEY          # For Ansible SSH access
 ```
 
 **Environment Secrets** (per environment: qa, prod):
+
 ```
 DB_HOST                  # MySQL server hostname
 DB_PORT                  # 3306
@@ -275,12 +282,14 @@ remote_state {
 ## Cloud-Init Strategy
 
 **Minimal bootstrap only**:
+
 - Create admin user
 - Install base packages (Docker, Azure CLI)
 - Configure SSH keys
 - Enable Docker service
 
 **All ongoing configuration via Ansible**:
+
 - Application deployments
 - Container updates
 - Environment variables
@@ -377,7 +386,7 @@ git push origin feature/add-key-vault
 ✅ SSH key-based authentication  
 ✅ Network security groups on VMs  
 ✅ Private endpoints for databases  
-✅ ACR admin disabled, use RBAC  
+✅ ACR admin disabled, use RBAC
 
 ## Related Repositories
 
