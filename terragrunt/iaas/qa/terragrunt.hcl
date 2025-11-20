@@ -26,7 +26,7 @@ inputs = {
 
   app_service_plan_sku = "B1"
 
-  # Reference shared ACR
+  # Reference shared ACR (t)
   acr_login_server    = dependency.shared.outputs.acr_login_server
   acr_admin_username  = dependency.shared.outputs.acr_admin_username
   acr_admin_password  = dependency.shared.outputs.acr_admin_password
