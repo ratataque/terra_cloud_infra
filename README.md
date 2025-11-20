@@ -390,7 +390,7 @@ git push origin feature/add-key-vault
 
 ## Related Repositories
 
-- **Application Code**: [terra_cloud](../terra_cloud)
+- **Application Code**: [terra_cloud](https://github.com/ratataque/terra_cloud)
 
 ## Support
 

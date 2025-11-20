@@ -13,12 +13,11 @@ Complete guide to configure all secrets needed for both repositories.
 
 **How to get**:
 ```bash
-# If you already have a service principal
-az ad sp list --display-name "TerraCloud-GitHub-OIDC" --query "[0].appId" -o tsv
+# Using your existing service principal
+az ad sp list --display-name "terracloud-cd-deployer" --query "[0].appId" -o tsv
 
-# Or create a new one
-APP_ID=$(az ad app create --display-name "TerraCloud-GitHub-OIDC" --query appId -o tsv)
-echo "AZURE_CLIENT_ID: $APP_ID"
+# Or get from app registration
+az ad app list --display-name "terracloud-cd-deployer" --query "[0].appId" -o tsv
 ```
 
 #### 2. `AZURE_TENANT_ID`
