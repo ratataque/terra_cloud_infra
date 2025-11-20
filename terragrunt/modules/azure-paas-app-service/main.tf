@@ -106,7 +106,7 @@ resource "azurerm_container_registry_webhook" "app" {
   location            = data.azurerm_resource_group.main.location
 
   service_uri = format(
-    "https://$%s:%s@%s.scm.azurewebsites.net/docker/hook",
+    "https://$%s:%s@%s.scm.azurewebsites.net/api/registry/webhook",
     azurerm_linux_web_app.main.name,
     azurerm_linux_web_app.main.site_credential[0].password,
     azurerm_linux_web_app.main.name
