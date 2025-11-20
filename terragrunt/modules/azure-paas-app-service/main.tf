@@ -82,6 +82,7 @@ resource "azurerm_linux_web_app" "main" {
     "DB_DATABASE"                         = azurerm_mysql_flexible_database.main.name
     "DB_USERNAME"                         = azurerm_mysql_flexible_server.main.administrator_login
     "DB_PASSWORD"                         = azurerm_mysql_flexible_server.main.administrator_password
+    "MYSQL_ATTR_SSL_CA"                   = "/var/www/html/storage/certs/DigiCertGlobalRootG2.crt.pem"
   })
 
   identity {
