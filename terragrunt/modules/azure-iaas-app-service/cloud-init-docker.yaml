@@ -22,12 +22,9 @@ write_files:
                 - "--providers.docker=true"
                 - "--providers.docker.exposedbydefault=false"
                 - "--entrypoints.web.address=:80"
-                - "--entrypoints.metrics.address=:8082"
-                - "--metrics.prometheus=true"
-                - "--metrics.prometheus.entryPoint=metrics"
+                - "--metrics.prometheus=false"
               ports:
                 - "80:80"
-                - "8082:8082"
               volumes:
                 - "/var/run/docker.sock:/var/run/docker.sock:ro"
               networks:
@@ -58,9 +55,11 @@ write_files:
               container_name: app
               restart: unless-stopped
               environment:
-                APP_DEBUG: "${jsonencode(lookup(jsondecode(app_settings), "APP_DEBUG", "false"))}"
-                APP_ENV: "${jsonencode(lookup(jsondecode(app_settings), "APP_ENV", "production"))}"
                 APP_KEY: "${app_key}"
+                APP_ENV: "${lookup(jsondecode(app_settings), "APP_ENV", "production")}"
+                APP_DEBUG: "${lookup(jsondecode(app_settings), "APP_DEBUG", "false")}"
+                APP_URL: "${lookup(jsondecode(app_settings), "APP_URL", "http://localhost")}"
+                LOG_LEVEL: "${lookup(jsondecode(app_settings), "LOG_LEVEL", "info")}"
                 DB_CONNECTION: mysql
                 DB_HOST: db
                 DB_PORT: 3306
@@ -68,7 +67,8 @@ write_files:
                 DB_USERNAME: ${db_username}
                 DB_PASSWORD: ${db_password}
               depends_on:
-                - db
+                db:
+                    condition: service_healthy
               networks:
                 - app-net
               labels:
