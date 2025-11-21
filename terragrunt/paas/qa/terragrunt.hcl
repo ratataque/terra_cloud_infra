@@ -39,7 +39,7 @@ inputs = {
   db_storage_gb     = 20
 
   docker_image     = "app"  # Just the image name, not the full path
-  docker_image_tag = get_env("DOCKER_TAG", "latest")
+  docker_image_tag = get_env("DOCKER_TAG", "latest-qa")
 
   app_settings = merge(
     include.root.locals.common_app_settings,

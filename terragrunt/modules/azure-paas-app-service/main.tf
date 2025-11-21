@@ -112,7 +112,7 @@ resource "azurerm_container_registry_webhook" "app" {
     azurerm_linux_web_app.main.name
   )
   status  = "enabled"
-  scope   = "app:latest"
+  scope   = "${var.docker_image}:${var.docker_image_tag}"
   actions = ["push"]
 
   custom_headers = {

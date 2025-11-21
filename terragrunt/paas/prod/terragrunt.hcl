@@ -35,11 +35,11 @@ inputs = {
   db_name           = "terracloud_prod"
   db_admin_username = "sqladmin"
   db_admin_password = include.root.locals.db_admin_password
-  db_sku            = "GP_Standard_D2ds_v4"
-  db_storage_gb     = 100
+  db_sku            = "B_Standard_B1ms"
+  db_storage_gb     = 20
 
-  docker_image     = "${dependency.shared.outputs.acr_login_server}/${include.root.locals.docker_image_base}"
-  docker_image_tag = get_env("DOCKER_TAG", "stable")
+  docker_image     = "app"  # Just the image name, not the full path
+  docker_image_tag = get_env("DOCKER_TAG", "latest-prod")
 
   app_settings = merge(
     include.root.locals.common_app_settings,

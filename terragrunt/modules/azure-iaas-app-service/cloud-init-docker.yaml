@@ -1,132 +1,132 @@
 #cloud-config
 package_update: true
-package_upgrade: true
+package_upgrade: false # Skip full upgrade for faster boot
 
 packages:
-  - docker.io
-  - docker-compose-plugin
-  - curl
+    - docker.io
+    - docker-compose-plugin
+    - curl
 
 write_files:
-  # docker-compose.yml for IaaS with Traefik + App + MySQL
-  # Traefik enables rolling updates during CD via Ansible
-  - path: /opt/app/docker-compose.yml
-    permissions: "0644"
-    content: |
-      services:
-        traefik:
-          image: "traefik:v3.0"
-          container_name: traefik
-          restart: unless-stopped
-          command:
-            - "--providers.docker=true"
-            - "--providers.docker.exposedbydefault=false"
-            - "--entrypoints.web.address=:80"
-            - "--entrypoints.metrics.address=:8082"
-            - "--metrics.prometheus=true"
-            - "--metrics.prometheus.entryPoint=metrics"
-          ports:
-            - "80:80"
-            - "8082:8082"
+    # docker-compose.yml for IaaS with Traefik + App + MySQL
+    # Traefik enables rolling updates during CD via Ansible
+    - path: /opt/app/docker-compose.yml
+      permissions: "0644"
+      content: |
+          services:
+            traefik:
+              image: "traefik:v3.0"
+              container_name: traefik
+              restart: unless-stopped
+              command:
+                - "--providers.docker=true"
+                - "--providers.docker.exposedbydefault=false"
+                - "--entrypoints.web.address=:80"
+                - "--entrypoints.metrics.address=:8082"
+                - "--metrics.prometheus=true"
+                - "--metrics.prometheus.entryPoint=metrics"
+              ports:
+                - "80:80"
+                - "8082:8082"
+              volumes:
+                - "/var/run/docker.sock:/var/run/docker.sock:ro"
+              networks:
+                - app-net
+            
+            db:
+              image: mysql:8.0
+              container_name: db
+              restart: unless-stopped
+              command: --default-authentication-plugin=mysql_native_password
+              environment:
+                MYSQL_DATABASE: ${db_name}
+                MYSQL_USER: ${db_username}
+                MYSQL_PASSWORD: ${db_password}
+                MYSQL_ROOT_PASSWORD: ${db_root_password}
+                MYSQL_TCP_PORT: 3306
+              volumes:
+                - db_data:/var/lib/mysql
+              networks:
+                - app-net
+              healthcheck:
+                test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+                timeout: 5s
+                retries: 10
+            
+            app:
+              image: ${acr_login_server}/${docker_image}:${docker_image_tag}
+              container_name: app
+              restart: unless-stopped
+              environment:
+                APP_DEBUG: "${jsonencode(lookup(jsondecode(app_settings), "APP_DEBUG", "false"))}"
+                APP_ENV: "${jsonencode(lookup(jsondecode(app_settings), "APP_ENV", "production"))}"
+                APP_KEY: "${app_key}"
+                DB_CONNECTION: mysql
+                DB_HOST: db
+                DB_PORT: 3306
+                DB_DATABASE: ${db_name}
+                DB_USERNAME: ${db_username}
+                DB_PASSWORD: ${db_password}
+              depends_on:
+                - db
+              networks:
+                - app-net
+              labels:
+                - "traefik.enable=true"
+                - "traefik.http.routers.app.rule=HostRegexp(`.*`)"
+                - "traefik.http.services.app.loadbalancer.server.port=80"
+
           volumes:
-            - "/var/run/docker.sock:/var/run/docker.sock:ro"
-          networks:
-            - app-net
-        
-        db:
-          image: mysql:8.0
-          container_name: db
-          restart: unless-stopped
-          command: --default-authentication-plugin=mysql_native_password
-          environment:
-            MYSQL_DATABASE: ${db_name}
-            MYSQL_USER: ${db_username}
-            MYSQL_PASSWORD: ${db_password}
-            MYSQL_ROOT_PASSWORD: ${db_root_password}
-            MYSQL_TCP_PORT: 3306
-          volumes:
-            - db_data:/var/lib/mysql
-          networks:
-            - app-net
-          healthcheck:
-            test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
-            timeout: 5s
-            retries: 10
-        
-        app:
-          image: ${acr_login_server}/${docker_image}:${docker_image_tag}
-          container_name: app
-          restart: unless-stopped
-          environment:
-            APP_DEBUG: "${jsonencode(lookup(jsondecode(app_settings), "APP_DEBUG", "false"))}"
-            APP_ENV: "${jsonencode(lookup(jsondecode(app_settings), "APP_ENV", "production"))}"
-            APP_KEY: "${app_key}"
-            DB_CONNECTION: mysql
-            DB_HOST: db
-            DB_PORT: 3306
-            DB_DATABASE: ${db_name}
-            DB_USERNAME: ${db_username}
-            DB_PASSWORD: ${db_password}
-          depends_on:
-            - db
-          networks:
-            - app-net
-          labels:
-            - "traefik.enable=true"
-            - "traefik.http.routers.app.rule=HostRegexp(`.*`)"
-            - "traefik.http.services.app.loadbalancer.server.port=80"
-      
-      volumes:
-        db_data:
-      
-      networks:
-        app-net:
-          driver: bridge
+            db_data:
 
-  # Service systemd pour gérer la stack Docker
-  - path: /etc/systemd/system/app-stack.service
-    permissions: "0644"
-    content: |
-      [Unit]
-      Description=Docker Compose App Stack
-      Requires=docker.service
-      After=docker.service
+          networks:
+            app-net:
+              driver: bridge
 
-      [Service]
-      WorkingDirectory=/opt/app
-      ExecStart=/usr/bin/docker compose up -d
-      ExecStop=/usr/bin/docker compose down
-      Restart=always
-      TimeoutStartSec=0
+    # Service systemd pour gérer la stack Docker
+    - path: /etc/systemd/system/app-stack.service
+      permissions: "0644"
+      content: |
+          [Unit]
+          Description=Docker Compose App Stack
+          Requires=docker.service
+          After=docker.service
 
-      [Install]
-      WantedBy=multi-user.target
+          [Service]
+          WorkingDirectory=/opt/app
+          ExecStart=/usr/bin/docker compose up -d
+          ExecStop=/usr/bin/docker compose down
+          Restart=always
+          TimeoutStartSec=0
+
+          [Install]
+          WantedBy=multi-user.target
 
 runcmd:
-  # Install Docker packages
-  - apt-get update
-  - apt-get install -y docker.io docker-compose-plugin curl
+    # Install Docker packages
+    # - apt-get update
+    - apt-get install -y docker.io docker-compose-plugin curl
 
-  # Create app directory
-  - mkdir -p /opt/app
+    # Create app directory
+    - mkdir -p /opt/app
 
-  # Add azureuser to docker group
-  - usermod -aG docker azureuser
+    # Add azureuser to docker group
+    - usermod -aG docker azureuser
 
-  # Enable and start Docker
-  - systemctl enable docker
-  - systemctl start docker
+    # Enable and start Docker
+    - systemctl enable docker
+    - systemctl start docker
 
-  # Login to ACR using credentials
-  - sleep 30
-  - docker login ${acr_login_server} -u ${acr_admin_username} -p ${acr_admin_password}
+    # Login to ACR using credentials
+    - sleep 30
+    - docker login ${acr_login_server} -u ${acr_admin_username} -p ${acr_admin_password}
 
-  # Pull the initial app image
-  - docker pull ${acr_login_server}/${docker_image}:${docker_image_tag}
+    # Pull the initial app image
+    - docker pull ${acr_login_server}/${docker_image}:${docker_image_tag}
 
-  # Start the Docker Compose stack (Traefik + DB + App)
-  - systemctl daemon-reload
-  - systemctl enable app-stack
-  - systemctl start app-stack
+    # Start the Docker Compose stack (Traefik + DB + App)
+    - systemctl daemon-reload
+    - systemctl enable app-stack
+    - systemctl start app-stack
 
 final_message: "TerraCloud IaaS VM ready: Traefik + MySQL + App running. Ansible will handle rolling deployments."

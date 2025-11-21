@@ -46,7 +46,7 @@ inputs = {
 
   # Docker Image Configuration
   docker_image     = "app"
-  docker_image_tag = get_env("DOCKER_TAG", "stable")
+  docker_image_tag = get_env("DOCKER_TAG", "latest")
 
   # Application Settings
   app_key = include.root.locals.common_app_settings["APP_KEY"]
