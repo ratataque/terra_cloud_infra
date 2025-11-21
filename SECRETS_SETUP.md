@@ -89,7 +89,7 @@ az acr list --query "[].name" -o tsv
 **Same as app repo** - Azure Subscription ID
 
 #### 4. `SSH_PRIVATE_KEY`
-**What**: Private SSH key for Ansible to connect to VMs
+**What**: Private SSH key for Ansible to connect to VMs (used by app-deploy workflow)
 
 **How to get**:
 
@@ -104,20 +104,33 @@ cat ~/.ssh/id_rsa
 
 **Option B: Create new key for deployment**
 ```bash
-# Generate new key
+# Generate new key pair
 ssh-keygen -t rsa -b 4096 -C "github-actions-deploy" -f ~/.ssh/github_deploy_key -N ""
 
-# Display private key (for GitHub secret)
+# Display private key (for GitHub secret SSH_PRIVATE_KEY)
 cat ~/.ssh/github_deploy_key
 
-# Display public key (to add to VMs)
+# Display public key (for GitHub secret SSH_PUBLIC_KEY)
 cat ~/.ssh/github_deploy_key.pub
-
-# Copy public key to VM (if VM already exists)
-ssh-copy-id -i ~/.ssh/github_deploy_key.pub azureuser@<VM_IP>
 ```
 
-**Note**: The public key should be added to VMs during Terraform provisioning (in cloud-init or VM settings).
+**Note**: You need BOTH the private and public keys as separate secrets.
+
+#### 5. `SSH_PUBLIC_KEY`
+**What**: Public SSH key to provision on VMs during Terraform deployment (used by infra-deploy workflow)
+
+**How to get**:
+```bash
+# If you used Option A above
+cat ~/.ssh/id_rsa.pub
+
+# If you used Option B above
+cat ~/.ssh/github_deploy_key.pub
+```
+
+**Format**: Should start with `ssh-rsa` or `ssh-ed25519` followed by the key data.
+
+**Example**: `ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQ... github-actions-deploy`
 
 ---
 
@@ -274,6 +287,7 @@ terragrunt apply
 - [ ] `AZURE_TENANT_ID` = `...`
 - [ ] `AZURE_SUBSCRIPTION_ID` = `...`
 - [ ] `SSH_PRIVATE_KEY` = `-----BEGIN OPENSSH PRIVATE KEY-----...`
+- [ ] `SSH_PUBLIC_KEY` = `ssh-rsa AAAAB3NzaC1yc2E...`
 
 **Settings → Environments**
 
@@ -352,6 +366,7 @@ jobs:
 | `ACR_NAME` | ✅ | ❌ | ❌ | ❌ | `terragrunt output` |
 | `INFRA_REPO_PAT` | ✅* | ❌ | ❌ | ❌ | GitHub PAT |
 | `SSH_PRIVATE_KEY` | ❌ | ✅ | ❌ | ❌ | `cat ~/.ssh/id_rsa` |
+| `SSH_PUBLIC_KEY` | ❌ | ✅ | ❌ | ❌ | `cat ~/.ssh/id_rsa.pub` |
 | `DB_HOST` | ❌ | ❌ | ✅ | ✅ | `terragrunt output` |
 | `DB_PORT` | ❌ | ❌ | ✅ | ✅ | `3306` |
 | `DB_DATABASE` | ❌ | ❌ | ✅ | ✅ | `terragrunt output` |

@@ -1,0 +1,87 @@
+#cloud-config
+package_update: true
+package_upgrade: true
+
+packages:
+  - nginx
+  - curl
+
+write_files:
+  - path: /etc/nginx/sites-available/app
+    content: |
+      server {
+          listen 80;
+          server_name _;
+          
+          root /var/www/html;
+          index index.html;
+          
+          location / {
+              try_files $uri $uri/ =404;
+          }
+          
+          location /health {
+              access_log off;
+              return 200 "healthy\n";
+              add_header Content-Type text/plain;
+          }
+      }
+  
+  - path: /var/www/html/index.html
+    content: |
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Test - TerraCloud</title>
+          <style>
+              body {
+                  font-family: Arial, sans-serif;
+                  display: flex;
+                  justify-content: center;
+                  align-items: center;
+                  height: 100vh;
+                  margin: 0;
+                  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                  color: white;
+              }
+              .container {
+                  text-align: center;
+                  padding: 2rem;
+                  background: rgba(255, 255, 255, 0.1);
+                  border-radius: 10px;
+                  backdrop-filter: blur(10px);
+              }
+              h1 {
+                  font-size: 3rem;
+                  margin: 0;
+              }
+              p {
+                  font-size: 1.2rem;
+                  margin-top: 1rem;
+              }
+          </style>
+      </head>
+      <body>
+          <div class="container">
+              <h1>🧪 Page de Test</h1>
+              <p>TerraCloud IaaS - VM: $(hostname)</p>
+              <p>Fichier statique servi par Nginx</p>
+          </div>
+      </body>
+      </html>
+  
+
+runcmd:
+  # Créer le répertoire pour les fichiers statiques
+  - mkdir -p /var/www/html
+  - chown -R www-data:www-data /var/www/html
+  
+  # Configure Nginx
+  - rm -f /etc/nginx/sites-enabled/default
+  - ln -sf /etc/nginx/sites-available/app /etc/nginx/sites-enabled/app
+  - systemctl enable nginx
+  - systemctl restart nginx
+
+final_message: "TerraCloud VM is ready! Test page should be accessible via nginx."

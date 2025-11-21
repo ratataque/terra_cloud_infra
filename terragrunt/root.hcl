@@ -3,6 +3,23 @@ locals {
   env         = basename(get_terragrunt_dir())
   region      = get_env("AZURE_REGION", "France Central")
   
+  # Generate unique state path based on directory structure
+  # Examples: "shared", "iaas/prod", "paas/qa"
+  relative_path = replace(path_relative_to_include(), "terragrunt/", "")
+  
+  # Map each environment to its own storage account
+  # This ensures complete state isolation between environments
+  storage_account_map = {
+    "shared"    = "tfstatesharedcloud"
+    "iaas/qa"   = "tfstateiaasqa"
+    "iaas/prod" = "tfstateiaasprod"
+    "paas/qa"   = "tfstatepaasqa"
+    "paas/prod" = "tfstatepaasprod"
+  }
+  
+  # Get the storage account for this environment
+  storage_account_name = lookup(local.storage_account_map, local.relative_path, "terracloudtfstate")
+  
   # Project-wide configuration
   resource_group_name = "rg-stg_1"
   project_name        = "terracloud"
@@ -10,6 +27,11 @@ locals {
   
   # Database common configuration
   db_admin_password = get_env("DB_ADMIN_PASSWORD", "TerraCloud2024!")
+  db_root_password  = get_env("DB_ROOT_PASSWORD", "RootTerraCloud2024!")
+  
+  # SSH Configuration for IaaS VMs
+  # Must be a valid SSH public key (ssh-rsa, ssh-ed25519, etc.)
+  ssh_public_key = get_env("SSH_PUBLIC_KEY", "")
   
   # Docker configuration
   docker_image_base = "app"
@@ -42,10 +64,10 @@ remote_state {
   }
 
   config = {
-    resource_group_name  = get_env("TF_STATE_RG", "rg-stg_1")
-    storage_account_name = get_env("TF_STATE_SA", "terracloudtfstate")
+    resource_group_name  = "rg-stg_1"
+    storage_account_name = local.storage_account_name
     container_name       = "tfstate"
-    key                  = "${local.env}/terraform.tfstate"
+    key                  = "terraform.tfstate"
   }
 }
 

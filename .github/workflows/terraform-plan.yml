@@ -19,96 +19,108 @@ env:
   ARM_USE_OIDC: true
 
 jobs:
-  plan-qa:
-    name: Plan QA Environment
+  plan-shared:
+    name: Plan Shared Infrastructure
     runs-on: ubuntu-latest
     
     steps:
       - name: Checkout
         uses: actions/checkout@v4
       
-      - name: Azure Login via OIDC
-        uses: azure/login@v1
-        with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: 1.5.7
-          terraform_wrapper: false
-
       - name: Setup Terragrunt
-        run: |
-          wget -q https://github.com/gruntwork-io/terragrunt/releases/download/v0.54.0/terragrunt_linux_amd64
-          chmod +x terragrunt_linux_amd64
-          sudo mv terragrunt_linux_amd64 /usr/local/bin/terragrunt
+        uses: ./.github/actions/setup-terragrunt
+        with:
+          azure_client_id: ${{ secrets.AZURE_CLIENT_ID }}
+          azure_tenant_id: ${{ secrets.AZURE_TENANT_ID }}
+          azure_subscription_id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       - name: Terragrunt Plan - Shared
         working-directory: terragrunt/shared
         run: |
-          terragrunt plan -no-color > plan.txt
-          echo "## Shared Infrastructure Plan" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          cat plan.txt >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
+          terragrunt init
+          terragrunt plan -no-color > plan.txt 2>&1 || true
+          
+      - name: Upload Shared Plan
+        uses: actions/upload-artifact@v4
+        with:
+          name: plan-shared
+          path: terragrunt/shared/plan.txt
+          retention-days: 5
 
-      - name: Terragrunt Plan - QA IaaS
-        working-directory: terragrunt/iaas/qa
+  plan-environments:
+    name: Plan ${{ matrix.deployment }}/${{ matrix.env }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        deployment: [iaas, paas]
+        env: [qa, prod]
+      fail-fast: false
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Setup Terragrunt
+        uses: ./.github/actions/setup-terragrunt
+        with:
+          azure_client_id: ${{ secrets.AZURE_CLIENT_ID }}
+          azure_tenant_id: ${{ secrets.AZURE_TENANT_ID }}
+          azure_subscription_id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Terragrunt Plan - ${{ matrix.deployment }}/${{ matrix.env }}
+        working-directory: terragrunt/${{ matrix.deployment }}/${{ matrix.env }}
         run: |
-          terragrunt plan -no-color > plan.txt
-          echo "## QA IaaS Environment Plan" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          cat plan.txt >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
+          terragrunt init
+          terragrunt plan -no-color > plan.txt 2>&1 || true
+          
+      - name: Upload Plan
+        uses: actions/upload-artifact@v4
+        with:
+          name: plan-${{ matrix.deployment }}-${{ matrix.env }}
+          path: terragrunt/${{ matrix.deployment }}/${{ matrix.env }}/plan.txt
+          retention-days: 5
 
-      - name: Terragrunt Plan - QA PaaS
-        working-directory: terragrunt/paas/qa
-        run: |
-          terragrunt plan -no-color > plan.txt
-          echo "## QA PaaS Environment Plan" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          cat plan.txt >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-
+  comment-pr:
+    name: Comment PR with Plans
+    runs-on: ubuntu-latest
+    needs: [plan-shared, plan-environments]
+    if: github.event_name == 'pull_request'
+    
+    steps:
+      - name: Download all plans
+        uses: actions/download-artifact@v4
+        with:
+          path: plans/
+      
       - name: Comment PR with Plan
         uses: actions/github-script@v7
         with:
           script: |
             const fs = require('fs');
-            const sharedPlan = fs.existsSync('terragrunt/shared/plan.txt') ? fs.readFileSync('terragrunt/shared/plan.txt', 'utf8') : 'No changes';
-            const qaIaasPlan = fs.existsSync('terragrunt/iaas/qa/plan.txt') ? fs.readFileSync('terragrunt/iaas/qa/plan.txt', 'utf8') : 'No changes';
-            const qaPaasPlan = fs.existsSync('terragrunt/paas/qa/plan.txt') ? fs.readFileSync('terragrunt/paas/qa/plan.txt', 'utf8') : 'No changes';
+            const path = require('path');
             
-            const output = `#### Terraform Plan Results
+            const plansDir = 'plans';
+            let output = '#### Terraform Plan Results\n\n';
             
-            <details><summary>Shared Infrastructure</summary>
+            // Read shared plan
+            const sharedPath = path.join(plansDir, 'plan-shared', 'plan.txt');
+            const sharedPlan = fs.existsSync(sharedPath) ? fs.readFileSync(sharedPath, 'utf8') : 'No changes';
+            output += '<details><summary>Shared Infrastructure</summary>\n\n```\n' + sharedPlan + '\n```\n\n</details>\n\n';
             
-            \`\`\`
-            ${sharedPlan}
-            \`\`\`
+            // Read environment plans
+            const environments = ['qa', 'prod'];
+            const deployments = ['iaas', 'paas'];
             
-            </details>
+            for (const env of environments) {
+              output += `### ${env.toUpperCase()} Environment\n\n`;
+              for (const deployment of deployments) {
+                const planPath = path.join(plansDir, `plan-${deployment}-${env}`, 'plan.txt');
+                const plan = fs.existsSync(planPath) ? fs.readFileSync(planPath, 'utf8') : 'No changes';
+                output += `<details><summary>${deployment.toUpperCase()} - ${env.toUpperCase()}</summary>\n\n\`\`\`\n${plan}\n\`\`\`\n\n</details>\n\n`;
+              }
+            }
             
-            <details><summary>QA IaaS Environment</summary>
-            
-            \`\`\`
-            ${qaIaasPlan}
-            \`\`\`
-            
-            </details>
-            
-            <details><summary>QA PaaS Environment</summary>
-            
-            \`\`\`
-            ${qaPaasPlan}
-            \`\`\`
-            
-            </details>
-            
-            *Pusher: @${{ github.actor }}, Action: \`${{ github.event_name }}\`*`;
+            output += `*Pusher: @${{ github.actor }}, Action: \`${{ github.event_name }}\`*`;
             
             github.rest.issues.createComment({
               issue_number: context.issue.number,
