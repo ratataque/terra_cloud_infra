@@ -12,7 +12,7 @@ locals {
   storage_account_map = {
     "shared"    = "tfstatesharedcloud"
     "iaas/qa"   = "tfstateiaasqa"
-    "iaas/prod" = "tfstateiaasprоd"
+    "iaas/prod" = "tfstateiaasprod"
     "paas/qa"   = "tfstatepaasqa"
     "paas/prod" = "tfstatepaasprod"
   }
