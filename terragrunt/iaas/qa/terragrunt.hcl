@@ -25,7 +25,7 @@ inputs = {
   )
 
   # VM Configuration (remplace App Service Plan du PaaS)
-  vm_size  = "Standard_B1ls"# 1 vCPU, 1 GB RAM
+  vm_size  = "Standard_B1s"# 1 vCPU, 1 GB RAM
   vm_count = 1               # ne seule VM
   enable_load_balancer = false # (par défaut false, mais explicite)
 
