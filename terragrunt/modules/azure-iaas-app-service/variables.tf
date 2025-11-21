@@ -29,7 +29,7 @@ variable "tags" {
 variable "vm_size" {
   description = "The size of the Virtual Machine"
   type        = string
-  default     = "Standard_B1ls"
+  default     = "Standard_B1s"
 }
 
 variable "vm_count" {

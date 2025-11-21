@@ -48,8 +48,8 @@ inputs = {
       "APP_DEBUG"     = "false"
       "APP_URL"       = "https://terracloud-prod-app.azurewebsites.net"
       "LOG_LEVEL"     = "warning"
-      "CACHE_DRIVER"  = "redis"
-      "SESSION_DRIVER" = "redis"
+      # "CACHE_DRIVER"  = "redis"
+      # "SESSION_DRIVER" = "redis"
     }
   )
 }
