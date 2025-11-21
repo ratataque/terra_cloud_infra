@@ -36,7 +36,9 @@ jobs:
 
       - name: Terragrunt Plan - Shared
         working-directory: terragrunt/shared
-        run: terragrunt plan -no-color > plan.txt 2>&1 || true
+        run: |
+          terragrunt init
+          terragrunt plan -no-color > plan.txt 2>&1 || true
           
       - name: Upload Shared Plan
         uses: actions/upload-artifact@v4
@@ -67,7 +69,9 @@ jobs:
 
       - name: Terragrunt Plan - ${{ matrix.deployment }}/${{ matrix.env }}
         working-directory: terragrunt/${{ matrix.deployment }}/${{ matrix.env }}
-        run: terragrunt plan -no-color > plan.txt 2>&1 || true
+        run: |
+          terragrunt init
+          terragrunt plan -no-color > plan.txt 2>&1 || true
           
       - name: Upload Plan
         uses: actions/upload-artifact@v4
