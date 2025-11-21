@@ -4,7 +4,7 @@ include "root" {
 }
 
 terraform {
-  source = "../../modules/azure-paas-app-service"
+  source = "../../modules/azure-iaas-app-service"
 }
 
 dependency "shared" {
