@@ -103,28 +103,6 @@ write_files:
           WantedBy=multi-user.target
 
 runcmd:
-    # Install Docker packages
-    - sudo apt-get update
-    - sudo apt-get install -y ca-certificates curl
-    - sudo install -m 0755 -d /etc/apt/keyrings
-    - sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
-    - sudo chmod a+r /etc/apt/keyrings/docker.asc
-
-    # Add the repository to Apt sources:
-    - echo \
-      "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu \
-      $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
-      sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-
-    # 3. Install Docker Engine and Compose Plugin
-    - sudo apt-get update
-    - sudo apt-get install -y docker.io docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-
-    # 4. (Optional) Allow running docker without sudo
-    # This adds your current user 'azureuser' (or similar) to the docker group
-    - sudo usermod -aG docker $USER
-    - newgrp docker
-
     # Create app directory
     - mkdir -p /opt/app
 
@@ -135,16 +113,16 @@ runcmd:
     - systemctl enable docker
     - systemctl start docker
 
+    # Wait for Docker to be ready
+    - sleep 10
+
     # Login to ACR using credentials
-    - sleep 30
     - docker login ${acr_login_server} -u ${acr_admin_username} -p ${acr_admin_password}
 
     # Pull the initial app image
     - docker pull ${acr_login_server}/${docker_image}:${docker_image_tag}
 
-    # Start the Docker Compose stack (Traefik + DB + App)
-    # - systemctl daemon-reload
-    # - systemctl enable app-stack
-    # - systemctl start app-stack
+    # Start the Docker Compose stack
+    # - cd /opt/app && docker compose up -d
 
 final_message: "TerraCloud IaaS VM ready: Traefik + MySQL + App running. Ansible will handle rolling deployments."
