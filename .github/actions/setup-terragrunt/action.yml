@@ -1,0 +1,45 @@
+name: Setup Terragrunt
+description: Install Terraform and Terragrunt with Azure authentication
+
+inputs:
+  terraform_version:
+    description: 'Terraform version to install'
+    required: false
+    default: '1.5.7'
+  terragrunt_version:
+    description: 'Terragrunt version to install'
+    required: false
+    default: '0.54.0'
+  azure_client_id:
+    description: 'Azure Client ID for OIDC'
+    required: true
+  azure_tenant_id:
+    description: 'Azure Tenant ID for OIDC'
+    required: true
+  azure_subscription_id:
+    description: 'Azure Subscription ID for OIDC'
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Azure Login via OIDC
+      uses: azure/login@v1
+      with:
+        client-id: ${{ inputs.azure_client_id }}
+        tenant-id: ${{ inputs.azure_tenant_id }}
+        subscription-id: ${{ inputs.azure_subscription_id }}
+
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: ${{ inputs.terraform_version }}
+        terraform_wrapper: false
+
+    - name: Setup Terragrunt
+      shell: bash
+      run: |
+        wget -q https://github.com/gruntwork-io/terragrunt/releases/download/v${{ inputs.terragrunt_version }}/terragrunt_linux_amd64
+        chmod +x terragrunt_linux_amd64
+        sudo mv terragrunt_linux_amd64 /usr/local/bin/terragrunt
+        terragrunt --version

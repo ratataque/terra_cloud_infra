@@ -3,6 +3,23 @@ locals {
   env         = basename(get_terragrunt_dir())
   region      = get_env("AZURE_REGION", "France Central")
   
+  # Generate unique state path based on directory structure
+  # Examples: "shared", "iaas/prod", "paas/qa"
+  relative_path = replace(path_relative_to_include(), "terragrunt/", "")
+  
+  # Map each environment to its own storage account
+  # This ensures complete state isolation between environments
+  storage_account_map = {
+    "shared"    = "tfstatesharedcloud"
+    "iaas/qa"   = "tfstateiaasqa"
+    "iaas/prod" = "tfstateiaasprоd"
+    "paas/qa"   = "tfstatepaasqa"
+    "paas/prod" = "tfstatepaasprod"
+  }
+  
+  # Get the storage account for this environment
+  storage_account_name = lookup(local.storage_account_map, local.relative_path, "terracloudtfstate")
+  
   # Project-wide configuration
   resource_group_name = "rg-stg_1"
   project_name        = "terracloud"
@@ -42,10 +59,10 @@ remote_state {
   }
 
   config = {
-    resource_group_name  = get_env("TF_STATE_RG", "rg-stg_1")
-    storage_account_name = get_env("TF_STATE_SA", "terracloudtfstate")
+    resource_group_name  = "rg-stg_1"
+    storage_account_name = local.storage_account_name
     container_name       = "tfstate"
-    key                  = "${local.env}/terraform.tfstate"
+    key                  = "terraform.tfstate"
   }
 }
 

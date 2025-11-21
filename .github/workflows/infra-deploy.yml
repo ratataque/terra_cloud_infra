@@ -28,24 +28,12 @@ jobs:
             - name: Checkout
               uses: actions/checkout@v4
 
-            - name: Azure Login via OIDC
-              uses: azure/login@v1
-              with:
-                  client-id: ${{ secrets.AZURE_CLIENT_ID }}
-                  tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-                  subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-
-            - name: Setup Terraform
-              uses: hashicorp/setup-terraform@v3
-              with:
-                  terraform_version: 1.5.7
-                  terraform_wrapper: false
-
             - name: Setup Terragrunt
-              run: |
-                  wget -q https://github.com/gruntwork-io/terragrunt/releases/download/v0.54.0/terragrunt_linux_amd64
-                  chmod +x terragrunt_linux_amd64
-                  sudo mv terragrunt_linux_amd64 /usr/local/bin/terragrunt
+              uses: ./.github/actions/setup-terragrunt
+              with:
+                  azure_client_id: ${{ secrets.AZURE_CLIENT_ID }}
+                  azure_tenant_id: ${{ secrets.AZURE_TENANT_ID }}
+                  azure_subscription_id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
             - name: Deploy Shared Infrastructure
               working-directory: terragrunt/shared
@@ -53,107 +41,56 @@ jobs:
                   terragrunt init
                   terragrunt apply -auto-approve
 
-    deploy-qa-iaas:
-        name: Deploy QA Environment (Iaas)
+    deploy-qa:
+        name: Deploy QA Environments
         runs-on: ubuntu-latest
         needs: [deploy-shared]
         environment: qa
+        strategy:
+            matrix:
+                deployment: [iaas, paas]
+            fail-fast: false
 
         steps:
             - name: Checkout
               uses: actions/checkout@v4
 
-            - name: Azure Login via OIDC
-              uses: azure/login@v1
-              with:
-                  client-id: ${{ secrets.AZURE_CLIENT_ID }}
-                  tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-                  subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-
-            - name: Setup Terraform
-              uses: hashicorp/setup-terraform@v3
-              with:
-                  terraform_version: 1.5.7
-                  terraform_wrapper: false
-
             - name: Setup Terragrunt
-              run: |
-                  wget -q https://github.com/gruntwork-io/terragrunt/releases/download/v0.54.0/terragrunt_linux_amd64
-                  chmod +x terragrunt_linux_amd64
-                  sudo mv terragrunt_linux_amd64 /usr/local/bin/terragrunt
+              uses: ./.github/actions/setup-terragrunt
+              with:
+                  azure_client_id: ${{ secrets.AZURE_CLIENT_ID }}
+                  azure_tenant_id: ${{ secrets.AZURE_TENANT_ID }}
+                  azure_subscription_id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-            - name: Deploy QA Infrastructure
-              working-directory: terragrunt/iaas/qa
+            - name: Deploy QA ${{ matrix.deployment }} Infrastructure
+              working-directory: terragrunt/${{ matrix.deployment }}/qa
               run: |
                   terragrunt init
                   terragrunt apply -auto-approve
 
-    deploy-qa-paas:
-        name: Deploy QA Environment (PaaS)
+    deploy-prod:
+        name: Deploy Production Environments
         runs-on: ubuntu-latest
         needs: [deploy-shared]
-        environment: qa
-
-        steps:
-            - name: Checkout
-              uses: actions/checkout@v4
-
-            - name: Azure Login via OIDC
-              uses: azure/login@v1
-              with:
-                  client-id: ${{ secrets.AZURE_CLIENT_ID }}
-                  tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-                  subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-
-            - name: Setup Terraform
-              uses: hashicorp/setup-terraform@v3
-              with:
-                  terraform_version: 1.5.7
-                  terraform_wrapper: false
-
-            - name: Setup Terragrunt
-              run: |
-                  wget -q https://github.com/gruntwork-io/terragrunt/releases/download/v0.54.0/terragrunt_linux_amd64
-                  chmod +x terragrunt_linux_amd64
-                  sudo mv terragrunt_linux_amd64 /usr/local/bin/terragrunt
-
-            - name: Deploy QA Infrastructure (PaaS)
-              working-directory: terragrunt/paas/qa
-              run: |
-                  terragrunt init
-                  terragrunt apply -auto-approve
-
-    deploy-prod-iaas:
-        name: Deploy Production Environment
-        runs-on: ubuntu-latest
-        needs: [deploy-shared, deploy-qa-iaas]
         environment: prod
+        strategy:
+            matrix:
+                deployment: [iaas, paas]
+            fail-fast: false
 
         steps:
             - name: Checkout
               uses: actions/checkout@v4
 
-            - name: Azure Login via OIDC
-              uses: azure/login@v1
-              with:
-                  client-id: ${{ secrets.AZURE_CLIENT_ID }}
-                  tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-                  subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-
-            - name: Setup Terraform
-              uses: hashicorp/setup-terraform@v3
-              with:
-                  terraform_version: 1.5.7
-                  terraform_wrapper: false
-
             - name: Setup Terragrunt
-              run: |
-                  wget -q https://github.com/gruntwork-io/terragrunt/releases/download/v0.54.0/terragrunt_linux_amd64
-                  chmod +x terragrunt_linux_amd64
-                  sudo mv terragrunt_linux_amd64 /usr/local/bin/terragrunt
+              uses: ./.github/actions/setup-terragrunt
+              with:
+                  azure_client_id: ${{ secrets.AZURE_CLIENT_ID }}
+                  azure_tenant_id: ${{ secrets.AZURE_TENANT_ID }}
+                  azure_subscription_id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-            - name: Deploy Production Infrastructure
-              working-directory: terragrunt/iaas/prod
+            - name: Deploy Production ${{ matrix.deployment }} Infrastructure
+              working-directory: terragrunt/${{ matrix.deployment }}/prod
               run: |
                   terragrunt init
                   terragrunt apply -auto-approve
