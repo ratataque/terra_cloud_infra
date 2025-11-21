@@ -103,6 +103,10 @@ write_files:
           WantedBy=multi-user.target
 
 runcmd:
+    # Install Docker manually to control memory usage
+    - sudo apt-get install -y docker.io
+    - sudo apt-get install -y docker-compose
+
     # Create app directory
     - mkdir -p /opt/app
 
@@ -122,7 +126,7 @@ runcmd:
     # Pull the initial app image
     - docker pull ${acr_login_server}/${docker_image}:${docker_image_tag}
 
-    # Start the Docker Compose stack
+    # Start the Docker Compose stack (commented for manual debugging)
     # - cd /opt/app && docker compose up -d
 
 final_message: "TerraCloud IaaS VM ready: Traefik + MySQL + App running. Ansible will handle rolling deployments."
