@@ -3,8 +3,8 @@ package_update: true
 package_upgrade: false # Skip full upgrade for faster boot
 
 packages:
-    - docker.io
-    - docker-compose-plugin
+    # - docker.io
+    # - docker-compose-plugin
     - curl
 
 write_files:
