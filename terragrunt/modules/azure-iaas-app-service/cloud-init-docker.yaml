@@ -143,8 +143,8 @@ runcmd:
     - docker pull ${acr_login_server}/${docker_image}:${docker_image_tag}
 
     # Start the Docker Compose stack (Traefik + DB + App)
-    - systemctl daemon-reload
-    - systemctl enable app-stack
-    - systemctl start app-stack
+    # - systemctl daemon-reload
+    # - systemctl enable app-stack
+    # - systemctl start app-stack
 
 final_message: "TerraCloud IaaS VM ready: Traefik + MySQL + App running. Ansible will handle rolling deployments."
