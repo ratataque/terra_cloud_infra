@@ -24,7 +24,13 @@ inputs = {
     }
   )
 
-  app_service_plan_sku = "P1v3"
+  # VM Configuration (IaaS)
+  vm_size  = "Standard_B2s"  # 2 vCPU, 4 GB RAM for production
+  vm_count = 1
+  enable_load_balancer = false
+
+  # SSH Key for VM access
+  ssh_public_key = get_env("SSH_PUBLIC_KEY", "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC... votre-cle-publique")
 
   # Reference shared ACR
   acr_login_server    = dependency.shared.outputs.acr_login_server
@@ -32,14 +38,18 @@ inputs = {
   acr_admin_password  = dependency.shared.outputs.acr_admin_password
   acr_id              = dependency.shared.outputs.acr_id
 
+  # Database Configuration (IaaS: MySQL in Docker Compose)
   db_name           = "terracloud_prod"
   db_admin_username = "sqladmin"
   db_admin_password = include.root.locals.db_admin_password
-  db_sku            = "GP_Standard_D2ds_v4"
-  db_storage_gb     = 100
+  db_root_password  = include.root.locals.db_root_password
 
-  docker_image     = "${dependency.shared.outputs.acr_login_server}/${include.root.locals.docker_image_base}"
+  # Docker Image Configuration
+  docker_image     = "app"
   docker_image_tag = get_env("DOCKER_TAG", "stable")
+
+  # Application Settings
+  app_key = include.root.locals.common_app_settings["APP_KEY"]
 
   app_settings = merge(
     include.root.locals.common_app_settings,

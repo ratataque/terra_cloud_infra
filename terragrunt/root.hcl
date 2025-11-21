@@ -27,6 +27,11 @@ locals {
   
   # Database common configuration
   db_admin_password = get_env("DB_ADMIN_PASSWORD", "TerraCloud2024!")
+  db_root_password  = get_env("DB_ROOT_PASSWORD", "RootTerraCloud2024!")
+  
+  # SSH Configuration for IaaS VMs
+  # Must be a valid SSH public key (ssh-rsa, ssh-ed25519, etc.)
+  ssh_public_key = get_env("SSH_PUBLIC_KEY", "")
   
   # Docker configuration
   docker_image_base = "app"
