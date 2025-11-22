@@ -70,7 +70,10 @@ jobs:
         run: |
           echo "Initializing Terragrunt for ${{ env.ENV_NAME }}..."
           terragrunt init -reconfigure
-          VM_IP=$(terragrunt output -raw vm_public_ip)
+          
+          # Get first VM public IP (array output)
+          VM_IPS=$(terragrunt output -json vm_public_ips)
+          VM_IP=$(echo $VM_IPS | jq -r '.[0]')
           
           echo "Getting ACR name from shared..."
           cd ../../shared
