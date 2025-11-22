@@ -32,6 +32,9 @@ inputs = {
   # Clé SSH pour accéder aux VMs (vous devez générer une clé SSH)
   ssh_public_key = get_env("SSH_PUBLIC_KEY", "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC... votre-cle-publique")
 
+  # Use custom image with Docker pre-installed
+  custom_image_id = include.root.locals.custom_image_id
+
   # Reference shared ACR (t)
   acr_login_server    = dependency.shared.outputs.acr_login_server
   acr_admin_username  = dependency.shared.outputs.acr_admin_username
@@ -46,7 +49,7 @@ inputs = {
 
   # Docker Image Configuration
   docker_image     = "app"  # Just the image name, not the full path
-  docker_image_tag = get_env("DOCKER_TAG", "latest")
+  docker_image_tag = get_env("DOCKER_TAG", "latest-qa")
 
   # Application Settings
   app_key = include.root.locals.common_app_settings["APP_KEY"]

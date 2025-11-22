@@ -195,6 +195,19 @@ resource "azurerm_linux_virtual_machine" "vm" {
     azurerm_network_interface.vm[count.index].id,
   ]
 
+  # Use custom image if provided, otherwise use marketplace image
+  source_image_id = var.custom_image_id != "" ? var.custom_image_id : null
+
+  dynamic "source_image_reference" {
+    for_each = var.custom_image_id == "" ? [1] : []
+    content {
+      publisher = "Canonical"
+      offer     = "0001-com-ubuntu-server-jammy"
+      sku       = "22_04-lts-gen2"
+      version   = "latest"
+    }
+  }
+
   admin_ssh_key {
     username   = var.admin_username
     public_key = var.ssh_public_key
@@ -203,13 +216,6 @@ resource "azurerm_linux_virtual_machine" "vm" {
   os_disk {
     caching              = "ReadWrite"
     storage_account_type = "Premium_LRS"
-  }
-
-  source_image_reference {
-    publisher = "Canonical"
-    offer     = "0001-com-ubuntu-server-jammy"
-    sku       = "22_04-lts-gen2"
-    version   = "latest"
   }
 
   identity {

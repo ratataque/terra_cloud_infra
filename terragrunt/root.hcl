@@ -25,6 +25,9 @@ locals {
   project_name        = "terracloud"
   location            = "westeurope"
   
+  # Custom VM image with Docker pre-installed
+  custom_image_id = "/subscriptions/6b9318b1-2215-418a-b0fd-ba0832e9b333/resourceGroups/rg-stg_1/providers/Microsoft.Compute/images/ubuntu2204-docker-image"
+  
   # Database common configuration
   db_admin_password = get_env("DB_ADMIN_PASSWORD", "TerraCloud2024!")
   db_root_password  = get_env("DB_ROOT_PASSWORD", "RootTerraCloud2024!")

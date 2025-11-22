@@ -32,6 +32,9 @@ inputs = {
   # SSH Key for VM access
   ssh_public_key = get_env("SSH_PUBLIC_KEY", "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC... votre-cle-publique")
 
+  # Use custom image with Docker pre-installed
+  custom_image_id = include.root.locals.custom_image_id
+
   # Reference shared ACR
   acr_login_server    = dependency.shared.outputs.acr_login_server
   acr_admin_username  = dependency.shared.outputs.acr_admin_username
@@ -46,7 +49,7 @@ inputs = {
 
   # Docker Image Configuration
   docker_image     = "app"
-  docker_image_tag = get_env("DOCKER_TAG", "latest")
+  docker_image_tag = get_env("DOCKER_TAG", "latest-prod")
 
   # Application Settings
   app_key = include.root.locals.common_app_settings["APP_KEY"]
@@ -58,8 +61,8 @@ inputs = {
       "APP_DEBUG"     = "false"
       "APP_URL"       = "https://terracloud-prod-app.azurewebsites.net"
       "LOG_LEVEL"     = "warning"
-      "CACHE_DRIVER"  = "redis"
-      "SESSION_DRIVER" = "redis"
+      # "CACHE_DRIVER"  = "redis"
+      # "SESSION_DRIVER" = "redis"
     }
   )
 }

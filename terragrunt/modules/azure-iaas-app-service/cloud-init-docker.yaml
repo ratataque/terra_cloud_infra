@@ -104,8 +104,8 @@ write_files:
 
 runcmd:
     # Install Docker manually to control memory usage
-    - sudo apt-get install -y docker.io
-    - sudo apt-get install -y docker-compose
+    # - sudo apt-get install -y docker.io
+    # - sudo apt-get install -y docker-compose
 
     # Create app directory
     - mkdir -p /opt/app
@@ -114,17 +114,17 @@ runcmd:
     - usermod -aG docker azureuser
 
     # Enable and start Docker
-    - systemctl enable docker
-    - systemctl start docker
+    - sudo systemctl enable docker
+    - sudo systemctl start docker
 
     # Wait for Docker to be ready
     - sleep 10
 
     # Login to ACR using credentials
-    - docker login ${acr_login_server} -u ${acr_admin_username} -p ${acr_admin_password}
+    - sudo docker login ${acr_login_server} -u ${acr_admin_username} -p ${acr_admin_password}
 
     # Pull the initial app image
-    - docker pull ${acr_login_server}/${docker_image}:${docker_image_tag}
+    # - docker pull ${acr_login_server}/${docker_image}:${docker_image_tag}
 
     # Start the Docker Compose stack (commented for manual debugging)
     # - cd /opt/app && docker compose up -d

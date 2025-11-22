@@ -38,6 +38,12 @@ variable "vm_count" {
   default     = 1
 }
 
+variable "custom_image_id" {
+  description = "The ID of the custom VM image with Docker pre-installed"
+  type        = string
+  default     = ""
+}
+
 variable "admin_username" {
   description = "Admin username for the VMs"
   type        = string
