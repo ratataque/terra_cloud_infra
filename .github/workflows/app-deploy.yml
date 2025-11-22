@@ -83,11 +83,12 @@ jobs:
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
 
-      - name: Deploy with Ansible
+      - name: Deploy with Ansible (stop-then-start for 512MB RAM)
         working-directory: ansible
         env:
           ANSIBLE_HOST_KEY_CHECKING: False
-          "${ENV_NAME}_VM_IP": ${{ steps.infra.outputs.vm_ip }}
+          qa_VM_IP: ${{ steps.infra.outputs.vm_ip }}
+          prod_VM_IP: ${{ steps.infra.outputs.vm_ip }}
           ACR_NAME: ${{ steps.infra.outputs.acr_name }}
           IMAGE_TAG: ${{ env.IMAGE_TAG }}
           SSH_KEY_PATH: ~/.ssh/id_rsa
@@ -102,7 +103,9 @@ jobs:
           DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
           APP_KEY: ${{ secrets.APP_KEY }}
         run: |
-          ansible-playbook -i inventories/${{ env.ENV_NAME }}.yml playbooks/deploy.yml
+          echo "🛑 Using stop-then-start deployment (no zero-downtime)"
+          echo "Expected downtime: 10-30 seconds"
+          ansible-playbook -i inventories/${{ env.ENV_NAME }}.yml playbooks/deploy.yml -v
 
       - name: Deployment Summary
         run: |
