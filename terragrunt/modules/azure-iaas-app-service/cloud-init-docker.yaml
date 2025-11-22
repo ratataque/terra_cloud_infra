@@ -118,10 +118,10 @@ runcmd:
     - sudo systemctl start docker
 
     # Wait for Docker to be ready
-    - sleep 10
+    # - sleep 10
 
     # Login to ACR using credentials
-    - sudo docker login ${acr_login_server} -u ${acr_admin_username} -p ${acr_admin_password}
+    # - sudo docker login ${acr_login_server} -u ${acr_admin_username} -p ${acr_admin_password}
 
     # Pull the initial app image
     # - docker pull ${acr_login_server}/${docker_image}:${docker_image_tag}
