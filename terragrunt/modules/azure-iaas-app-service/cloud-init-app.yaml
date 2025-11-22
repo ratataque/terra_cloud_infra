@@ -1,0 +1,102 @@
+#cloud-config
+# Lightweight cloud-init for App VM with Docker pre-installed
+# Deploys Traefik + Application, connects to remote DB
+
+write_files:
+    - path: /opt/app/docker-compose.yml
+      owner: root:root
+      permissions: "0644"
+      content: |
+          services:
+            traefik:
+              image: traefik:v3.0
+              container_name: traefik
+              restart: unless-stopped
+              command:
+                - "--providers.docker=true"
+                - "--providers.docker.exposedbydefault=false"
+                - "--entrypoints.web.address=:80"
+              ports:
+                - "80:80"
+              volumes:
+                - "/var/run/docker.sock:/var/run/docker.sock:ro"
+              networks:
+                - app-net
+            
+            app:
+              image: ${acr_login_server}/${docker_image}:${docker_image_tag}
+              container_name: app
+              restart: unless-stopped
+              environment:
+                - APP_KEY=${app_key}
+                - APP_ENV=${lookup(jsondecode(app_settings), "APP_ENV", "production")}
+                - APP_DEBUG=${lookup(jsondecode(app_settings), "APP_DEBUG", "false")}
+                - APP_URL=${lookup(jsondecode(app_settings), "APP_URL", "http://localhost")}
+                - LOG_LEVEL=${lookup(jsondecode(app_settings), "LOG_LEVEL", "info")}
+                - DB_CONNECTION=mysql
+                - DB_HOST=10.0.2.4
+                - DB_PORT=3306
+                - DB_DATABASE=${db_name}
+                - DB_USERNAME=${db_username}
+                - DB_PASSWORD=${db_password}
+              networks:
+                - app-net
+              labels:
+                - "traefik.enable=true"
+                - "traefik.http.routers.app.rule=HostRegexp(`.*`)"
+                - "traefik.http.services.app.loadbalancer.server.port=80"
+
+          networks:
+            app-net:
+              driver: bridge
+
+    - path: /opt/app/wait-for-db.sh
+      owner: root:root
+      permissions: "0755"
+      content: |
+          #!/bin/bash
+          # Wait for database to be ready before starting app
+          DB_HOST="10.0.2.4"
+          DB_PORT="3306"
+          MAX_RETRIES=30
+          RETRY_INTERVAL=5
+
+          echo "Waiting for database at $${DB_HOST}:$${DB_PORT}..."
+
+          for i in $(seq 1 $${MAX_RETRIES}); do
+            if nc -z -w3 $${DB_HOST} $${DB_PORT} 2>/dev/null; then
+              echo "Database port is open, checking connection..."
+              # Try to connect with mysql client
+              if docker run --rm --network host mariadb:10.11-jammy \
+                mysql -h$${DB_HOST} -P$${DB_PORT} -u${db_username} -p${db_password} \
+                -e "SELECT 1" &>/dev/null; then
+                echo "Database connection successful!"
+                exit 0
+              fi
+            fi
+            echo "Attempt $${i}/$${MAX_RETRIES}: Database not ready, waiting $${RETRY_INTERVAL}s..."
+            sleep $${RETRY_INTERVAL}
+          done
+
+          echo "ERROR: Database did not become ready in time"
+          exit 1
+
+runcmd:
+    - mkdir -p /opt/app
+
+    - usermod -aG docker azureuser
+
+    - systemctl enable docker
+    - systemctl start docker
+
+    - sleep 10
+    - until docker info >/dev/null 2>&1; do echo "Waiting for docker..."; sleep 2; done
+
+    - echo "${acr_admin_password}" | docker login ${acr_login_server} -u ${acr_admin_username} --password-stdin
+
+    - cd /opt/app && docker-compose pull
+
+    # - echo "Waiting for database to be ready..."
+
+    - /opt/app/wait-for-db.sh
+    - test $? -eq 0 && cd /opt/app && docker-compose up -d && echo "App stack started successfully" || echo "Failed to start app - database not available"

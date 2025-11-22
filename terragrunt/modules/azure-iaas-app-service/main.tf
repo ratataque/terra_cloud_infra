@@ -29,6 +29,14 @@ resource "azurerm_subnet" "app" {
   address_prefixes     = var.subnet_address_prefixes
 }
 
+# Database Subnet
+resource "azurerm_subnet" "db" {
+  name                 = "${var.project_name}-${var.environment}-db-subnet"
+  resource_group_name  = data.azurerm_resource_group.main.name
+  virtual_network_name = azurerm_virtual_network.main.name
+  address_prefixes     = ["10.0.2.0/24"]
+}
+
 resource "azurerm_network_security_group" "app" {
   name                = "${var.project_name}-${var.environment}-nsg"
   location            = data.azurerm_resource_group.main.location
@@ -77,6 +85,45 @@ resource "azurerm_subnet_network_security_group_association" "app" {
   subnet_id                 = azurerm_subnet.app.id
   network_security_group_id = azurerm_network_security_group.app.id
 }
+
+# Database NSG - Only allow MySQL from app subnet
+resource "azurerm_network_security_group" "db" {
+  name                = "${var.project_name}-${var.environment}-db-nsg"
+  location            = data.azurerm_resource_group.main.location
+  resource_group_name = data.azurerm_resource_group.main.name
+
+  security_rule {
+    name                       = "AllowMySQLFromApp"
+    priority                   = 100
+    direction                  = "Inbound"
+    access                     = "Allow"
+    protocol                   = "Tcp"
+    source_port_range          = "*"
+    destination_port_range     = "3306"
+    source_address_prefix      = "10.0.1.0/24"
+    destination_address_prefix = "*"
+  }
+
+  security_rule {
+    name                       = "AllowSSHFromApp"
+    priority                   = 110
+    direction                  = "Inbound"
+    access                     = "Allow"
+    protocol                   = "Tcp"
+    source_port_range          = "*"
+    destination_port_range     = "22"
+    source_address_prefix      = "10.0.1.0/24"
+    destination_address_prefix = "*"
+  }
+
+  tags = var.tags
+}
+
+resource "azurerm_subnet_network_security_group_association" "db" {
+  subnet_id                 = azurerm_subnet.db.id
+  network_security_group_id = azurerm_network_security_group.db.id
+}
+
 
 # ------------------------------------------------------------------
 # Option SANS LB : une IP Publique par VM (si LB désactivé)
@@ -141,15 +188,15 @@ resource "azurerm_lb_probe" "http" {
 
 # Règle LB HTTP
 resource "azurerm_lb_rule" "http" {
-  count                           = var.enable_load_balancer ? 1 : 0
-  loadbalancer_id                 = azurerm_lb.main[0].id
-  name                            = "HTTPRule"
-  protocol                        = "Tcp"
-  frontend_port                   = 80
-  backend_port                    = 80
-  frontend_ip_configuration_name  = "PublicIPAddress"
-  backend_address_pool_ids        = [azurerm_lb_backend_address_pool.main[0].id]
-  probe_id                        = azurerm_lb_probe.http[0].id
+  count                          = var.enable_load_balancer ? 1 : 0
+  loadbalancer_id                = azurerm_lb.main[0].id
+  name                           = "HTTPRule"
+  protocol                       = "Tcp"
+  frontend_port                  = 80
+  backend_port                   = 80
+  frontend_ip_configuration_name = "PublicIPAddress"
+  backend_address_pool_ids       = [azurerm_lb_backend_address_pool.main[0].id]
+  probe_id                       = azurerm_lb_probe.http[0].id
 }
 
 # -------------------------------------------------
@@ -180,7 +227,7 @@ resource "azurerm_network_interface_backend_address_pool_association" "vm" {
 }
 
 # -----------------------------
-# Machines virtuelles Linux
+# App VMs (Traefik + Application)
 # -----------------------------
 resource "azurerm_linux_virtual_machine" "vm" {
   count               = var.vm_count
@@ -189,7 +236,7 @@ resource "azurerm_linux_virtual_machine" "vm" {
   location            = data.azurerm_resource_group.main.location
   size                = "Standard_B1ls"
   # size                = var.vm_size
-  admin_username      = var.admin_username
+  admin_username = var.admin_username
 
   network_interface_ids = [
     azurerm_network_interface.vm[count.index].id,
@@ -222,7 +269,7 @@ resource "azurerm_linux_virtual_machine" "vm" {
     type = "SystemAssigned"
   }
 
-  custom_data = base64encode(templatefile("${path.module}/cloud-init-docker.yaml", {
+  custom_data = base64encode(templatefile("${path.module}/cloud-init-app.yaml", {
     acr_login_server   = var.acr_login_server
     acr_admin_username = var.acr_admin_username
     acr_admin_password = var.acr_admin_password
@@ -252,3 +299,72 @@ resource "azurerm_role_assignment" "vm_to_acr" {
 # No Azure managed MySQL needed
 # Ansible handles rolling updates via Traefik
 # -----------------------------
+
+# -----------------------------
+# Database VMs (MariaDB)
+# -----------------------------
+
+# NIC for DB VMs (no public IP)
+resource "azurerm_network_interface" "db" {
+  count               = var.db_vm_count
+  name                = "${var.project_name}-${var.environment}-db-nic-${count.index}"
+  location            = data.azurerm_resource_group.main.location
+  resource_group_name = data.azurerm_resource_group.main.name
+
+  ip_configuration {
+    name                          = "internal"
+    subnet_id                     = azurerm_subnet.db.id
+    private_ip_address_allocation = "Static"
+    private_ip_address            = cidrhost("10.0.2.0/24", 4 + count.index)
+  }
+
+  tags = var.tags
+}
+
+resource "azurerm_linux_virtual_machine" "db" {
+  count               = var.db_vm_count
+  name                = "${var.project_name}-${var.environment}-db-vm-${count.index}"
+  resource_group_name = data.azurerm_resource_group.main.name
+  location            = data.azurerm_resource_group.main.location
+  size                = var.db_vm_size
+  admin_username      = var.admin_username
+
+  network_interface_ids = [
+    azurerm_network_interface.db[count.index].id,
+  ]
+
+  source_image_id = var.custom_image_id != "" ? var.custom_image_id : null
+
+  dynamic "source_image_reference" {
+    for_each = var.custom_image_id == "" ? [1] : []
+    content {
+      publisher = "Canonical"
+      offer     = "0001-com-ubuntu-server-jammy"
+      sku       = "22_04-lts-gen2"
+      version   = "latest"
+    }
+  }
+
+  admin_ssh_key {
+    username   = var.admin_username
+    public_key = var.ssh_public_key
+  }
+
+  os_disk {
+    caching              = "ReadWrite"
+    storage_account_type = "Premium_LRS"
+  }
+
+  identity {
+    type = "SystemAssigned"
+  }
+
+  custom_data = base64encode(templatefile("${path.module}/cloud-init-db.yaml", {
+    db_name          = var.db_name
+    db_username      = var.db_admin_username
+    db_password      = var.db_admin_password
+    db_root_password = var.db_root_password
+  }))
+
+  tags = var.tags
+}

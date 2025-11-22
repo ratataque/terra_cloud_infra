@@ -1,0 +1,66 @@
+#cloud-config
+# Lightweight cloud-init for DB VM with Docker pre-installed
+# Only deploys MariaDB container
+
+write_files:
+    - path: /opt/db/docker-compose.yml
+      owner: root:root
+      permissions: "0644"
+      content: |
+          services:
+            mariadb:
+              image: mariadb:10.11-jammy
+              container_name: terracloud-mariadb
+              restart: unless-stopped
+              environment:
+                - MARIADB_ROOT_PASSWORD=${db_root_password}
+                - MARIADB_DATABASE=${db_name}
+                - MARIADB_USER=${db_username}
+                - MARIADB_PASSWORD=${db_password}
+              volumes:
+                - db_data:/var/lib/mysql
+              ports:
+                - "3306:3306"
+              command: >
+                --max-connections=10
+                --innodb-buffer-pool-size=48M
+                --innodb-log-file-size=8M
+                --innodb-log-buffer-size=4M
+                --innodb-flush-log-at-trx-commit=2
+                --innodb-flush-method=O_DIRECT
+                --query-cache-size=0
+                --query-cache-type=0
+                --table-open-cache=64
+                --thread-cache-size=4
+                --max-allowed-packet=16M
+                --tmp-table-size=8M
+                --max-heap-table-size=8M
+                --key-buffer-size=8M
+                --read-buffer-size=128K
+                --read-rnd-buffer-size=256K
+                --sort-buffer-size=256K
+                --join-buffer-size=128K
+                --performance-schema=OFF
+                --skip-name-resolve
+              healthcheck:
+                test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+                interval: 30s
+                timeout: 10s
+                retries: 3
+
+          volumes:
+            db_data:
+
+runcmd:
+    # Create app directory
+    - mkdir -p /opt/db
+
+    # Add azureuser to docker group
+    - usermod -aG docker azureuser
+
+    # Enable and start Docker
+    - sudo systemctl enable docker
+    - sudo systemctl start docker
+
+    - cd /opt/db && docker-compose up -d
+    - echo "MariaDB started on $(hostname -I | awk '{print $1}'):3306"

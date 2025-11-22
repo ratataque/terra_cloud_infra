@@ -63,12 +63,22 @@ output "vm_public_ips" {
 }
 
 # ======================================================
-# Base de données MySQL (IaaS: runs in Docker Compose)
+# Base de données MySQL (IaaS: runs in Docker Compose on separate VM)
 # ======================================================
 
+output "db_vm_names" {
+  description = "The names of the database virtual machines"
+  value       = azurerm_linux_virtual_machine.db[*].name
+}
+
+output "db_vm_private_ips" {
+  description = "The private IP addresses of the database VMs"
+  value       = azurerm_network_interface.db[*].private_ip_address
+}
+
 output "database_host" {
-  description = "The database host (localhost for IaaS/Docker Compose)"
-  value       = "localhost"
+  description = "The database host (private IP of DB VM)"
+  value       = length(azurerm_network_interface.db) > 0 ? azurerm_network_interface.db[0].private_ip_address : "10.0.2.4"
 }
 
 output "database_name" {

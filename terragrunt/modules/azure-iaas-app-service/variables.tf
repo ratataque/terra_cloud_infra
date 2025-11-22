@@ -44,6 +44,18 @@ variable "custom_image_id" {
   default     = ""
 }
 
+variable "db_vm_count" {
+  description = "Number of database VMs"
+  type        = number
+  default     = 1
+}
+
+variable "db_vm_size" {
+  description = "Size of the database VMs"
+  type        = string
+  default     = "Standard_B1ls"
+}
+
 variable "admin_username" {
   description = "Admin username for the VMs"
   type        = string
