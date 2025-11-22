@@ -1,11 +1,11 @@
 #cloud-config
-package_update: true
-package_upgrade: false # Skip full upgrade for faster boot
-
-packages:
-    # - docker.io
-    # - docker-compose-plugin
-    - curl
+# package_update: true
+# package_upgrade: false # Skip full upgrade for faster boot
+#
+# packages:
+#     # - docker.io
+#     # - docker-compose-plugin
+#     - curl
 
 write_files:
     # docker-compose.yml for IaaS with Traefik + App + MySQL
