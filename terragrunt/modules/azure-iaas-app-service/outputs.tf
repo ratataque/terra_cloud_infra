@@ -84,16 +84,19 @@ output "database_host" {
 output "database_name" {
   description = "The name of the database"
   value       = var.db_name
+  sensitive   = true
 }
 
 output "database_admin_username" {
   description = "The database admin username"
   value       = var.db_admin_username
+  sensitive   = true
 }
 
 output "database_admin_password" {
   description = "The database admin password"
   value       = var.db_admin_password
+  sensitive   = true
 }
 
 # ======================================================
@@ -101,6 +104,7 @@ output "database_admin_password" {
 output "app_key" {
   description = "Laravel application key"
   value       = var.app_key
+  sensitive   = true
 }
 
 
