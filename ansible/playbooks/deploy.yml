@@ -25,6 +25,12 @@
       #       state: started
       #       enabled: yes
 
+      # - name: Log in to Azure Container Registry
+      #   community.docker.docker_login:
+      #       registry: "{{ acr_name }}.azurecr.io"
+      #       username: "{{ lookup('env', 'ACR_USERNAME') }}"
+      #       password: "{{ lookup('env', 'ACR_PASSWORD') }}"
+
       - name: Main Deployment and Rollback Block
         block:
             - name: Remove existing container
