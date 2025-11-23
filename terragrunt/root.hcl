@@ -1,15 +1,15 @@
 # Root Terragrunt Configuration for Azure PaaS
 locals {
-  # --- Robust Path Calculation ---
-  # Find the root of the git repo by looking for the .git folder.
-  repo_root = find_in_parent_folders(".git")
-
-  # Get the relative path from the repo root to the current terragrunt.hcl file.
-  # e.g., terragrunt/iaas/prod
-  path_from_root = path_relative(local.repo_root, get_terragrunt_dir())
+  # get_path_from_repo_root() returns the relative path from the root 
+  # of the Git repository to the current directory.
+  # e.g., "terragrunt/iaas/prod"
+  path_from_root = get_path_from_repo_root()
 
   # The key used in the storage_account_map, e.g., "iaas/prod"
   map_key = replace(local.path_from_root, "terragrunt/", "")
+  
+  # If you still need the absolute path to the repo root for other variables:
+  repo_root = get_repo_root()
 
   # --- Original Logic (now using robust path) ---
   env         = basename(get_terragrunt_dir())
