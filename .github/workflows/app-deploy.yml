@@ -1,140 +1,140 @@
 name: Application Deploy
 
 on:
-  workflow_dispatch:
-    inputs:
-      environment:
-        description: 'Environment to deploy to'
-        required: true
-        type: choice
-        options:
-          - qa
-          - prod
-      image_tag:
-        description: 'Docker image tag to deploy'
-        required: true
-        type: string
-  
-  # Can be triggered from app repo after successful build
-  repository_dispatch:
-    types: [deploy-app]
+    workflow_dispatch:
+        inputs:
+            environment:
+                description: "Environment to deploy to"
+                required: true
+                type: choice
+                options:
+                    - qa
+                    - prod
+            image_tag:
+                description: "Docker image tag to deploy"
+                required: true
+                type: string
+
+    # Can be triggered from app repo after successful build
+    repository_dispatch:
+        types: [deploy-app]
 
 permissions:
-  id-token: write
-  contents: read
+    id-token: write
+    contents: read
 
 jobs:
-  deploy:
-    name: Deploy to ${{ github.event.inputs.environment || github.event.client_payload.environment }}
-    runs-on: ubuntu-latest
-    environment: ${{ github.event.inputs.environment || github.event.client_payload.environment }}
-    
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+    deploy:
+        name: Deploy to ${{ github.event.inputs.environment || github.event.client_payload.environment }}
+        runs-on: ubuntu-latest
+        environment: ${{ github.event.inputs.environment || github.event.client_payload.environment }}
 
-      - name: Set environment variables
-        run: |
-          ENV_NAME="${{ github.event.inputs.environment || github.event.client_payload.environment }}"
-          IMAGE_TAG="${{ github.event.inputs.image_tag || github.event.client_payload.image_tag }}"
-          echo "ENV_NAME=$ENV_NAME" >> $GITHUB_ENV
-          echo "IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_ENV
-      
-      - name: Azure Login via OIDC
-        uses: azure/login@v1
-        with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
 
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: 1.5.7
-          terraform_wrapper: false
+            - name: Set environment variables
+              run: |
+                  ENV_NAME="${{ github.event.inputs.environment || github.event.client_payload.environment }}"
+                  IMAGE_TAG="${{ github.event.inputs.image_tag || github.event.client_payload.image_tag }}"
+                  echo "ENV_NAME=$ENV_NAME" >> $GITHUB_ENV
+                  echo "IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_ENV
 
-      - name: Setup Terragrunt
-        run: |
-          wget -q https://github.com/gruntwork-io/terragrunt/releases/download/v0.54.0/terragrunt_linux_amd64
-          chmod +x terragrunt_linux_amd64
-          sudo mv terragrunt_linux_amd64 /usr/local/bin/terragrunt
+            - name: Azure Login via OIDC
+              uses: azure/login@v1
+              with:
+                  client-id: ${{ secrets.AZURE_CLIENT_ID }}
+                  tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+                  subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Get infrastructure outputs
-        id: infra
-        working-directory: terragrunt/iaas/${{ env.ENV_NAME }}
-        env:
-          ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-          ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-          ARM_USE_OIDC: true
-        run: |
-          echo "Initializing Terragrunt for ${{ env.ENV_NAME }}..."
-          terragrunt init -reconfigure
-          
-          # Get first VM public IP (array output)
-          VM_IPS=$(terragrunt output -json vm_public_ips)
-          VM_IP=$(echo $VM_IPS | jq -r '.[0]')
-          
-          echo "Getting shared infrastructure outputs..."
-          cd ../../shared
-          terragrunt init -reconfigure
-          ACR_NAME=$(terragrunt output -raw acr_name)
-          ACR_USERNAME=$(terragrunt output -raw acr_admin_username)
-          ACR_PASSWORD=$(terragrunt output -raw acr_admin_password)
-          echo "::add-mask::$ACR_PASSWORD"
-          
-          echo "vm_ip=$VM_IP" >> $GITHUB_OUTPUT
-          echo "acr_name=$ACR_NAME" >> $GITHUB_OUTPUT
-          echo "acr_username=$ACR_USERNAME" >> $GITHUB_OUTPUT
-          echo "acr_password=$ACR_PASSWORD" >> $GITHUB_OUTPUT
+            - name: Setup Terraform
+              uses: hashicorp/setup-terraform@v3
+              with:
+                  terraform_version: 1.5.7
+                  terraform_wrapper: false
 
-      - name: Setup Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.11'
+            - name: Setup Terragrunt
+              run: |
+                  wget -q https://github.com/gruntwork-io/terragrunt/releases/download/v0.54.0/terragrunt_linux_amd64
+                  chmod +x terragrunt_linux_amd64
+                  sudo mv terragrunt_linux_amd64 /usr/local/bin/terragrunt
 
-      - name: Install Ansible
-        run: |
-          pip install ansible docker
-          ansible-galaxy collection install community.docker
+            - name: Get infrastructure outputs
+              id: infra
+              working-directory: terragrunt/iaas/${{ env.ENV_NAME }}
+              env:
+                  ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+                  ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+                  ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+                  ARM_USE_OIDC: true
+              run: |
+                  echo "Initializing Terragrunt for ${{ env.ENV_NAME }}..."
+                  terragrunt init -reconfigure
 
-      - name: Setup SSH key
-        run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
+                  # Get first VM public IP (array output)
+                  VM_IPS=$(terragrunt output -json vm_public_ips)
+                  VM_IP=$(echo $VM_IPS | jq -r '.[0]')
 
-      - name: Deploy with Ansible (stop-then-start for 512MB RAM)
-        working-directory: ansible
-        env:
-          ANSIBLE_HOST_KEY_CHECKING: False
-          qa_VM_IP: ${{ steps.infra.outputs.vm_ip }}
-          prod_VM_IP: ${{ steps.infra.outputs.vm_ip }}
-          ACR_NAME: ${{ steps.infra.outputs.acr_name }}
-          ACR_USERNAME: ${{ steps.infra.outputs.acr_username }}
-          ACR_PASSWORD: ${{ steps.infra.outputs.acr_password }}
-          IMAGE_TAG: ${{ env.IMAGE_TAG }}
-          SSH_KEY_PATH: ~/.ssh/id_rsa
-          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-          AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-          DB_CONNECTION: mysql
-          DB_HOST: ${{ secrets.DB_HOST }}
-          DB_PORT: ${{ secrets.DB_PORT }}
-          DB_DATABASE: ${{ secrets.DB_DATABASE }}
-          DB_USERNAME: ${{ secrets.DB_USERNAME }}
-          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
-          APP_KEY: ${{ secrets.APP_KEY }}
-        run: |
-          echo "🛑 Using stop-then-start deployment (no zero-downtime)"
-          echo "Expected downtime: 10-30 seconds"
-          ansible-playbook -i inventories/${{ env.ENV_NAME }}.yml playbooks/deploy.yml -v
+                  echo "Getting shared infrastructure outputs..."
+                  cd ../../shared
+                  terragrunt init -reconfigure
+                  ACR_NAME=$(terragrunt output -raw acr_name)
+                  ACR_USERNAME=$(terragrunt output -raw acr_admin_username)
+                  ACR_PASSWORD=$(terragrunt output -raw acr_admin_password)
+                  echo "::add-mask::$ACR_PASSWORD"
 
-      - name: Deployment Summary
-        run: |
-          echo "## Deployment Complete ✅" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- **Environment**: ${{ env.ENV_NAME }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Image Tag**: ${{ env.IMAGE_TAG }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **VM IP**: ${{ steps.infra.outputs.vm_ip }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **ACR**: ${{ steps.infra.outputs.acr_name }}" >> $GITHUB_STEP_SUMMARY
+                  echo "vm_ip=$VM_IP" >> $GITHUB_OUTPUT
+                  echo "acr_name=$ACR_NAME" >> $GITHUB_OUTPUT
+                  echo "acr_username=$ACR_USERNAME" >> $GITHUB_OUTPUT
+                  echo "acr_password=$ACR_PASSWORD" >> $GITHUB_OUTPUT
+
+            - name: Setup Python
+              uses: actions/setup-python@v4
+              with:
+                  python-version: "3.11"
+
+            - name: Install Ansible
+              run: |
+                  pip install ansible docker
+                  ansible-galaxy collection install community.docker
+
+            - name: Setup SSH key
+              run: |
+                  mkdir -p ~/.ssh
+                  echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+                  chmod 600 ~/.ssh/id_rsa
+
+            - name: Deploy with Ansible (stop-then-start for 512MB RAM)
+              working-directory: ansible
+              env:
+                  ANSIBLE_HOST_KEY_CHECKING: False
+                  QA_VM_IP: ${{ steps.infra.outputs.vm_ip }}
+                  PROD_VM_IP: ${{ steps.infra.outputs.vm_ip }}
+                  ACR_NAME: ${{ steps.infra.outputs.acr_name }}
+                  ACR_USERNAME: ${{ steps.infra.outputs.acr_username }}
+                  ACR_PASSWORD: ${{ steps.infra.outputs.acr_password }}
+                  IMAGE_TAG: ${{ env.IMAGE_TAG }}
+                  SSH_KEY_PATH: ~/.ssh/id_rsa
+                  AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+                  AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+                  AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+                  DB_CONNECTION: mysql
+                  DB_HOST: ${{ secrets.DB_HOST }}
+                  DB_PORT: ${{ secrets.DB_PORT }}
+                  DB_DATABASE: ${{ secrets.DB_DATABASE }}
+                  DB_USERNAME: ${{ secrets.DB_USERNAME }}
+                  DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+                  APP_KEY: ${{ secrets.APP_KEY }}
+              run: |
+                  echo "🛑 Using stop-then-start deployment (no zero-downtime)"
+                  echo "Expected downtime: 10-30 seconds"
+                  ansible-playbook -i inventories/${{ env.ENV_NAME }}.yml playbooks/deploy.yml -v
+
+            - name: Deployment Summary
+              run: |
+                  echo "## Deployment Complete ✅" >> $GITHUB_STEP_SUMMARY
+                  echo "" >> $GITHUB_STEP_SUMMARY
+                  echo "- **Environment**: ${{ env.ENV_NAME }}" >> $GITHUB_STEP_SUMMARY
+                  echo "- **Image Tag**: ${{ env.IMAGE_TAG }}" >> $GITHUB_STEP_SUMMARY
+                  echo "- **VM IP**: ${{ steps.infra.outputs.vm_ip }}" >> $GITHUB_STEP_SUMMARY
+                  echo "- **ACR**: ${{ steps.infra.outputs.acr_name }}" >> $GITHUB_STEP_SUMMARY
