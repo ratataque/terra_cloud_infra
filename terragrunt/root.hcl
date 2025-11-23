@@ -5,7 +5,7 @@ locals {
   
   # Generate unique state path based on directory structure
   # Examples: "shared", "iaas/prod", "paas/qa"
-  relative_path = replace(path_relative_to_repo(get_terragrunt_dir()), "terragrunt/", "")
+  relative_path = replace(path_relative_from_repo_root(), "terragrunt/", "")
   
   # Map each environment to its own storage account
   # This ensures complete state isolation between environments
