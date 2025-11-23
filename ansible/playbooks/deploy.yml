@@ -68,14 +68,17 @@
                   state: started
                   restart_policy: always
                   env:
-                      APP_ENV: "{{ env_name }}"
+                      APP_ENV: "production"
+                      APP_KEY: "{{ lookup('env', 'APP_KEY') }}"
+                      LOG_LEVEL: "info"
+                      APP_DEBUG: "false"
+                      APP_URL: "http://localhost"
                       DB_CONNECTION: "{{ lookup('env', 'DB_CONNECTION') | default('mysql') }}"
-                      DB_HOST: "{{ lookup('env', 'DB_HOST') }}"
+                      DB_HOST: "{{ lookup('env', 'DB_HOST') | default('10.0.2.4') }}"
                       DB_PORT: "{{ lookup('env', 'DB_PORT') | default('3306') }}"
                       DB_DATABASE: "{{ lookup('env', 'DB_DATABASE') }}"
                       DB_USERNAME: "{{ lookup('env', 'DB_USERNAME') }}"
                       DB_PASSWORD: "{{ lookup('env', 'DB_PASSWORD') }}"
-                      APP_KEY: "{{ lookup('env', 'APP_KEY') }}"
               register: container_start
 
             # - name: Wait for container to be healthy
