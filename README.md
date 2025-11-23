@@ -1,39 +1,134 @@
 # TerraCloud Infrastructure
 
-Infrastructure as Code (Terraform + Terragrunt) and Configuration Management (Ansible) for TerraCloud application on Azure.
+> Infrastructure as Code (Terraform + Terragrunt) and Configuration Management (Ansible) for deploying TerraCloud application on Azure
 
-## Repository Structure
+[![Infrastructure Deploy](https://github.com/ratataque/terracloud-infra/workflows/Infrastructure%20Deploy/badge.svg)](https://github.com/ratataque/terracloud-infra/actions)
+
+## 📋 Table of Contents
+
+- [Project Overview](#-project-overview)
+- [Repository Structure](#-repository-structure)
+- [Architecture](#-architecture)
+- [Quick Start](#-quick-start)
+- [Documentation](#-documentation)
+- [Contributing](#-contributing)
+
+---
+
+## 🎯 Project Overview
+
+**TerraCloud Infrastructure** is the Infrastructure as Code (IaC) repository for the TerraCloud application. This repository is **separate from the application code**, following a clean separation of concerns architecture.
+
+### What This Repository Contains
+
+This repository manages:
+
+- ✅ **Terraform/Terragrunt modules** - Azure resource definitions
+- ✅ **Ansible playbooks** - Application deployment automation
+- ✅ **CI/CD workflows** - Infrastructure provisioning and app deployment
+- ✅ **Environment configurations** - QA and Production settings
+
+### What This Repository Does NOT Contain
+
+Application-related code lives in a separate repository:
+
+- ❌ Laravel application code
+- ❌ Application CI/CD (build, test, push to ACR)
+- ❌ Dockerfile and docker-compose
+
+### Architecture Separation
 
 ```
-terra_cloud_infra/
+┌─────────────────────────────────────┐
+│   TerraCloud App Repository         │
+│   (Separate repo)                    │
+│                                      │
+│   • Laravel Application              │
+│   • Docker Configuration             │
+│   • CI: Build & Push to ACR          │
+└──────────────┬──────────────────────┘
+               │
+               │ Triggers deployment via
+               │ repository_dispatch event
+               ▼
+┌─────────────────────────────────────┐
+│   TerraCloud Infra Repository       │
+│   (This repo)                        │
+│                                      │
+│   • Terraform/Terragrunt             │
+│   • Ansible Playbooks                │
+│   • CD: Deploy from ACR to VMs       │
+└─────────────────────────────────────┘
+```
+
+### Technology Stack
+
+- **IaC**: Terraform 1.5.7 + Terragrunt 0.54.0
+- **Configuration Management**: Ansible 2.9+
+- **Cloud Provider**: Microsoft Azure
+- **CI/CD**: GitHub Actions with OIDC authentication
+- **Container Registry**: Azure Container Registry (ACR)
+- **Deployment Targets**: IaaS (VMs) and PaaS (App Service)
+
+---
+
+## 📁 Repository Structure
+
+```
+terracloud-infra/
+├── docs/                           # Detailed documentation
+│   ├── SETUP.md                    # Initial setup guide
+│   ├── ARCHITECTURE.md             # Infrastructure architecture
+│   ├── WORKFLOWS.md                # CI/CD workflows
+│   ├── DEPLOYMENT.md               # Deployment guide
+│   ├── ANSIBLE.md                  # Ansible playbook docs
+│   └── TROUBLESHOOTING.md          # Common issues
+│
 ├── terragrunt/
 │   ├── modules/                    # Terraform modules
-│   │   ├── azure-shared-infra/    # ACR, Key Vault, etc.
-│   │   ├── azure-iaas-app-service/# VMs, networking
-│   │   └── azure-paas-app-service/# App Service plans
-│   ├── shared/                     # Shared infrastructure (ACR)
-│   │   └── terragrunt.hcl
+│   │   ├── azure-shared-infra/    # ACR, shared resources
+│   │   ├── azure-iaas-app-service/# VMs, networking, MySQL
+│   │   └── azure-paas-app-service/# App Service, MySQL
+│   │
+│   ├── shared/                     # Shared infrastructure
+│   │   └── terragrunt.hcl         # ACR deployment
+│   │
 │   ├── iaas/                       # IaaS environments
 │   │   ├── qa/terragrunt.hcl
 │   │   └── prod/terragrunt.hcl
+│   │
 │   ├── paas/                       # PaaS environments
 │   │   ├── qa/terragrunt.hcl
 │   │   └── prod/terragrunt.hcl
-│   └── root.hcl                    # Root configuration
+│   │
+│   ├── root.hcl                    # Root Terragrunt config
+│   ├── backend.tf                  # Azure backend config
+│   └── provider.tf                 # Azure provider config
+│
 ├── ansible/
-│   ├── inventories/                # Environment inventories
-│   │   ├── qa.yml
-│   │   └── prod.yml
+│   ├── inventories/
+│   │   ├── qa.yml                  # QA inventory
+│   │   └── prod.yml                # Production inventory
 │   ├── playbooks/
 │   │   └── deploy.yml              # Application deployment
-│   └── ansible.cfg
-└── .github/workflows/
-    ├── terraform-plan.yml          # PR plans
-    ├── infra-deploy.yml            # Infrastructure deployment
-    └── app-deploy.yml              # Application deployment
+│   └── ansible.cfg                 # Ansible configuration
+│
+├── .github/
+│   ├── workflows/
+│   │   ├── terraform-plan.yml      # PR validation
+│   │   ├── infra-deploy.yml        # Infrastructure deployment
+│   │   └── app-deploy.yml          # Application deployment
+│   └── actions/
+│       └── setup-terragrunt/       # Reusable action
+│
+└── README.md                       # This file
 ```
 
-## Architecture Overview
+---
+
+## 🏗️ Architecture
+
+### Infrastructure Layers
 
 ```
 ┌─────────────────────────────────────────────────────────┐
@@ -44,155 +139,68 @@ terra_cloud_infra/
 │  │  - Shared across all environments               │    │
 │  └────────────────────────────────────────────────┘    │
 └─────────────────────────────────────────────────────────┘
-
-┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐
-│   QA (IaaS)      │  │  QA (PaaS)       │  │  Prod (IaaS)     │
-│  ┌────────────┐  │  │  ┌────────────┐  │  │  ┌────────────┐  │
-│  │    VM      │  │  │  │ App Service│  │  │  │    VM      │  │
-│  │  + Docker  │  │  │  │  (Docker)  │  │  │  │  + Docker  │  │
-│  └────────────┘  │  │  └────────────┘  │  │  └────────────┘  │
-│  ┌────────────┐  │  │  ┌────────────┐  │  │  ┌────────────┐  │
-│  │   MySQL    │  │  │  │   MySQL    │  │  │  │   MySQL    │  │
-│  └────────────┘  │  │  └────────────┘  │  │  └────────────┘  │
-└──────────────────┘  └──────────────────┘  └──────────────────┘
+                           │
+         ┌─────────────────┼─────────────────┐
+         │                 │                 │
+┌────────▼────────┐ ┌──────▼──────┐ ┌───────▼────────┐
+│   QA (IaaS)     │ │  QA (PaaS)  │ │  Prod (IaaS)   │
+│  ┌──────────┐   │ │ ┌─────────┐ │ │  ┌──────────┐  │
+│  │    VM    │   │ │ │App Svc. │ │ │  │    VM    │  │
+│  │ + Docker │   │ │ │(Docker) │ │ │  │ + Docker │  │
+│  └──────────┘   │ │ └─────────┘ │ │  └──────────┘  │
+│  ┌──────────┐   │ │ ┌─────────┐ │ │  ┌──────────┐  │
+│  │  MySQL   │   │ │ │  MySQL  │ │ │  │  MySQL   │  │
+│  └──────────┘   │ │ └─────────┘ │ │  └──────────┘  │
+└─────────────────┘ └─────────────┘ └────────────────┘
 ```
 
-## Workflows
+### Key Features
 
-### 1. Infrastructure Plan (PR)
+- **Shared ACR**: Single container registry for all environments
+- **Dual Deployment**: Support for both IaaS (VMs) and PaaS (App Service)
+- **Environment Isolation**: Separate QA and Production with independent resources
+- **Automated Deployment**: Ansible playbooks with health checks and rollback
+- **Immutable Infrastructure**: Deploy same container image across environments
 
-**Trigger**: Pull request to `main` with terragrunt changes
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for detailed architecture documentation.
 
-**Workflow**: `terraform-plan.yml`
+---
 
-- Runs `terragrunt plan` for affected environments
-- Posts plan as PR comment for review
-- No changes applied
-
-### 2. Infrastructure Deploy (Merge)
-
-**Trigger**: Push to `main` with terragrunt changes
-
-**Workflow**: `infra-deploy.yml`
-
-**Flow**:
-
-1. Deploy shared infrastructure (ACR)
-2. Deploy QA environment
-3. Deploy Stage/PaaS environment (requires approval)
-4. Deploy Production (requires approval)
-
-### 3. Application Deploy
-
-**Trigger**: Manual or repository_dispatch from app repo
-
-**Workflow**: `app-deploy.yml`
-
-**Flow**:
-
-1. Get infrastructure outputs (VM IP, ACR name)
-2. Run Ansible playbook
-3. Pull Docker image from ACR
-4. Stop old container
-5. Start new container
-6. Run health checks
-7. Run database migrations
-8. Rollback on failure
-
-## Setup Guide
+## 🚀 Quick Start
 
 ### Prerequisites
 
-- Azure CLI installed and authenticated
-- Terraform 1.5.7+
-- Terragrunt 0.54.0+
-- Ansible 2.9+
+- **Azure CLI** 2.50+ (authenticated)
+- **Terraform** 1.5.7+
+- **Terragrunt** 0.54.0+
+- **Ansible** 2.9+
+- **GitHub CLI** (optional, for workflow triggers)
 
-### 1. Azure Authentication (OIDC)
-
-Create Service Principal for GitHub Actions:
+### 1. Clone Repository
 
 ```bash
-SUBSCRIPTION_ID="your-sub-id"
-GITHUB_ORG="your-username"
-GITHUB_REPO="terra_cloud_infra"
-
-# Create app
-APP_ID=$(az ad app create --display-name "TerraCloud-Infra-OIDC" --query appId -o tsv)
-az ad sp create --id $APP_ID
-SP_ID=$(az ad sp list --display-name "TerraCloud-Infra-OIDC" --query "[0].id" -o tsv)
-
-# Grant Contributor role
-az role assignment create --assignee $SP_ID --role Contributor \
-  --scope "/subscriptions/$SUBSCRIPTION_ID"
-
-# Setup OIDC federation
-az ad app federated-credential create --id $APP_ID --parameters '{
-  "name": "GitHub-Main",
-  "issuer": "https://token.actions.githubusercontent.com",
-  "subject": "repo:'$GITHUB_ORG'/'$GITHUB_REPO':ref:refs/heads/main",
-  "audiences": ["api://AzureADTokenExchange"]
-}'
-
-TENANT_ID=$(az account show --query tenantId -o tsv)
-echo "AZURE_CLIENT_ID: $APP_ID"
-echo "AZURE_TENANT_ID: $TENANT_ID"
-echo "AZURE_SUBSCRIPTION_ID: $SUBSCRIPTION_ID"
+git clone https://github.com/ratataque/terracloud-infra.git
+cd terracloud-infra
 ```
 
-### 2. Setup GitHub Environments
+### 2. Configure Azure OIDC
 
-Create three environments with protection rules:
+```bash
+# Set your Azure subscription
+az account set --subscription "YOUR_SUBSCRIPTION_ID"
 
-#### QA Environment
-
-- **Name**: `qa`
-- **Protection**: None (auto-deploy)
-
-#### Stage Environment
-
-- **Name**: `stage`
-- **Protection**: Required reviewers (1+)
-
-#### Prod Environment
-
-- **Name**: `prod`
-- **Protection**: Required reviewers (2+)
-
-### 3. Configure GitHub Secrets
-
-**Repository Secrets** (all environments):
-
-```
-AZURE_CLIENT_ID
-AZURE_TENANT_ID
-AZURE_SUBSCRIPTION_ID
-SSH_PRIVATE_KEY          # For Ansible SSH access
+# Run setup script (see docs/SETUP.md for details)
 ```
 
-**Environment Secrets** (per environment: qa, prod):
-
-```
-DB_HOST                  # MySQL server hostname
-DB_PORT                  # 3306
-DB_DATABASE              # Database name
-DB_USERNAME              # Database username
-DB_PASSWORD              # Database password
-APP_KEY                  # Laravel app key (base64:...)
-```
-
-### 4. Initial Deployment
-
-#### Deploy Shared Infrastructure
+### 3. Deploy Shared Infrastructure
 
 ```bash
 cd terragrunt/shared
 terragrunt init
-terragrunt plan
 terragrunt apply
 ```
 
-#### Deploy QA Environment
+### 4. Deploy QA Environment
 
 ```bash
 cd terragrunt/iaas/qa
@@ -200,198 +208,193 @@ terragrunt init
 terragrunt apply
 ```
 
-#### Deploy Production
-
-```bash
-cd terragrunt/iaas/prod
-terragrunt init
-terragrunt apply
-```
-
-## Application Deployment with Ansible
-
-### Manual Deployment
+### 5. Deploy Application
 
 ```bash
 cd ansible
 
-# Set environment variables
-export QA_VM_IP="x.x.x.x"
-export ACR_NAME="youracrname"
-export IMAGE_TAG="1.2.3"
-export SSH_KEY_PATH="~/.ssh/id_rsa"
-export AZURE_CLIENT_ID="..."
-export AZURE_TENANT_ID="..."
-export AZURE_SUBSCRIPTION_ID="..."
-export DB_HOST="..."
-export DB_DATABASE="..."
-export DB_USERNAME="..."
-export DB_PASSWORD="..."
-export APP_KEY="base64:..."
+# Set environment variables (see docs/DEPLOYMENT.md)
+export IMAGE_TAG="1.0.0"
+export ENV_NAME="qa"
 
-# Deploy to QA
+# Deploy via Ansible
 ansible-playbook -i inventories/qa.yml playbooks/deploy.yml
-
-# Deploy to Production
-ansible-playbook -i inventories/prod.yml playbooks/deploy.yml
 ```
 
-### Automated Deployment (GitHub Actions)
+**For complete setup instructions, see [docs/SETUP.md](docs/SETUP.md)**
 
-Trigger from app repository or manually:
+---
 
+## 📚 Documentation
+
+### Core Documentation
+
+| Document | Description |
+|----------|-------------|
+| [SETUP.md](docs/SETUP.md) | Complete initial setup guide with Azure OIDC, GitHub secrets, and first deployment |
+| [ARCHITECTURE.md](docs/ARCHITECTURE.md) | Infrastructure architecture, modules, and resource organization |
+| [WORKFLOWS.md](docs/WORKFLOWS.md) | CI/CD workflows explanation and usage |
+| [DEPLOYMENT.md](docs/DEPLOYMENT.md) | Application deployment guide (manual and automated) |
+| [ANSIBLE.md](docs/ANSIBLE.md) | Ansible playbook structure and customization |
+| [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | Common issues and solutions |
+
+### Quick Reference
+
+**Deploy infrastructure:**
 ```bash
-# Via GitHub UI
-Actions → Application Deploy → Run workflow
-  Environment: qa
-  Image tag: 1.2.3
+cd terragrunt/<iaas|paas>/<qa|prod>
+terragrunt apply
+```
 
-# Via gh CLI
+**Deploy application:**
+```bash
+# Via GitHub Actions
 gh workflow run app-deploy.yml -f environment=qa -f image_tag=1.2.3
+
+# Via Ansible
+cd ansible
+ansible-playbook -i inventories/qa.yml playbooks/deploy.yml
 ```
 
-## Ansible Playbook Features
-
-The `deploy.yml` playbook:
-
-✅ Ensures Docker is installed  
-✅ Logs in to ACR  
-✅ Pulls specified image version  
-✅ Stops old container  
-✅ Starts new container  
-✅ Waits for health check (10 retries)  
-✅ Runs database migrations  
-❌ Rolls back to previous version on failure
-
-## Terraform State Backend
-
-State is stored in Azure Storage Account:
-
-```hcl
-remote_state {
-  backend = "azurerm"
-  config = {
-    resource_group_name  = "terracloud-tfstate-rg"
-    storage_account_name = "terracloudtfstate"
-    container_name       = "tfstate"
-    key                  = "${path_relative_to_include()}/terraform.tfstate"
-  }
-}
-```
-
-## Cloud-Init Strategy
-
-**Minimal bootstrap only**:
-
-- Create admin user
-- Install base packages (Docker, Azure CLI)
-- Configure SSH keys
-- Enable Docker service
-
-**All ongoing configuration via Ansible**:
-
-- Application deployments
-- Container updates
-- Environment variables
-- Service management
-
-## End-to-End Release Flow
-
-```
-1. Developer pushes to app repo
-   ↓
-2. CI: Build image → Tag v1.2.3 → Push to ACR
-   ↓
-3. CI: Trigger infra repo deployment (optional)
-   ↓
-4. Ansible: Deploy v1.2.3 to QA VM
-   ↓
-5. QA validation & approval
-   ↓
-6. Ansible: Promote v1.2.3 to Prod VM
-   ↓
-7. Same tested image running in production ✅
-```
-
-## Monitoring & Troubleshooting
-
-### Check Infrastructure Outputs
-
+**View outputs:**
 ```bash
 cd terragrunt/iaas/qa
 terragrunt output
-
-# Get specific output
-terragrunt output -raw vm_public_ip
 ```
 
-### Check Ansible Deployment
+---
 
-```bash
-# Test connectivity
-ansible -i inventories/qa.yml all -m ping
+## 🔄 Deployment Workflow
 
-# Check container status
-ansible -i inventories/qa.yml all -a "docker ps"
+### End-to-End Release Flow
 
-# View container logs
-ansible -i inventories/qa.yml all -a "docker logs terracloud-app"
+```
+1. Developer pushes to app repo (terracloud)
+   ↓
+2. App CI: Build image → Tag v1.2.3 → Push to ACR
+   ↓
+3. App CI: Trigger infra repo deployment (optional)
+   ↓
+4. Ansible: Deploy v1.2.3 to QA
+   - Pull image from ACR
+   - Stop old container
+   - Start new container
+   - Health checks
+   - Run migrations
+   ↓
+5. QA Testing & Approval
+   ↓
+6. Ansible: Promote v1.2.3 to Production
+   - Same image, no rebuild ✅
+   - Requires approval
 ```
 
-### Access VM
+See [docs/WORKFLOWS.md](docs/WORKFLOWS.md) for detailed workflow documentation.
 
-```bash
-# Get VM IP
-VM_IP=$(cd terragrunt/iaas/qa && terragrunt output -raw vm_public_ip)
+---
 
-# SSH to VM
-ssh -i ~/.ssh/id_rsa azureuser@$VM_IP
+## 🔐 Security
 
-# Check running containers
-docker ps
+- **OIDC Authentication**: No long-lived secrets in GitHub Actions
+- **Managed Identities**: Azure resources use managed identities
+- **Environment Protection**: GitHub Environments with approval workflows
+- **SSH Key-Based Auth**: Ansible connects to VMs via SSH keys
+- **Network Security**: NSGs restrict access to VMs and databases
+- **Secret Management**: Sensitive values in GitHub Environment secrets
 
-# View logs
-docker logs terracloud-app -f
-```
+See [docs/SETUP.md#security-configuration](docs/SETUP.md#security-configuration) for security setup.
 
-## Cost Optimization
+---
 
-- **Stop VMs**: When not in use (QA after hours)
-- **Scale down**: Use smaller VM sizes for QA
-- **Shared ACR**: Single ACR for all environments
-- **MySQL**: Stop flexible server when unused
+## 🛠️ Development
 
-## Updating Infrastructure
+### Making Infrastructure Changes
 
-```bash
-# 1. Create feature branch
-git checkout -b feature/add-key-vault
+1. **Create feature branch**
+   ```bash
+   git checkout -b feature/add-key-vault
+   ```
 
-# 2. Modify Terraform modules
-vim terragrunt/modules/azure-shared-infra/main.tf
+2. **Modify Terraform modules**
+   ```bash
+   vim terragrunt/modules/azure-shared-infra/main.tf
+   ```
 
-# 3. Push and create PR
-git push origin feature/add-key-vault
+3. **Test locally**
+   ```bash
+   cd terragrunt/shared
+   terragrunt plan
+   ```
 
-# 4. Review plan in PR comments
+4. **Create Pull Request**
+   ```bash
+   git add .
+   git commit -m "feat: add Azure Key Vault for secrets"
+   git push origin feature/add-key-vault
+   ```
 
-# 5. Merge to apply changes
-```
+5. **Review Terraform plan** in PR comments
 
-## Security Best Practices
+6. **Merge to deploy** infrastructure changes
 
-✅ Use OIDC authentication (no long-lived secrets)  
-✅ Managed identities for Azure resources  
-✅ Secrets in GitHub Environments  
-✅ SSH key-based authentication  
-✅ Network security groups on VMs  
-✅ Private endpoints for databases  
-✅ ACR admin disabled, use RBAC
+### Testing Changes
 
-## Related Repositories
+- **Local testing**: Use `terragrunt plan` before pushing
+- **PR validation**: GitHub Actions runs plan on all affected environments
+- **Selective apply**: Deploy to QA first, then Production
 
-- **Application Code**: [terra_cloud](https://github.com/ratataque/terra_cloud)
+---
 
-## Support
+## 💰 Cost Optimization
 
-For application issues, see the terra_cloud repository.
+- **Shared ACR**: Single registry reduces costs
+- **Stop VMs**: Shutdown QA VMs outside business hours
+- **Right-sizing**: Use B1s VMs for QA (512MB RAM optimized)
+- **Flexible MySQL**: Use Burstable tier for non-production
+- **Auto-shutdown**: Configure Azure auto-shutdown policies
+
+---
+
+## 🤝 Contributing
+
+### Workflow
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Make your changes
+4. Test with `terragrunt plan`
+5. Commit (`git commit -m 'feat: add amazing feature'`)
+6. Push to branch (`git push origin feature/amazing-feature`)
+7. Open a Pull Request
+
+### Commit Convention
+
+Follow conventional commits:
+
+- `feat:` - New features or infrastructure additions
+- `fix:` - Bug fixes or infrastructure corrections
+- `docs:` - Documentation updates
+- `refactor:` - Code refactoring without behavior changes
+- `chore:` - Maintenance tasks
+
+---
+
+## 📞 Support
+
+- **Application Issues**: See [terracloud repository](https://github.com/ratataque/terracloud)
+- **Infrastructure Issues**: Create an issue in this repository
+- **Documentation**: Check [docs/](docs/) folder
+
+---
+
+## 📄 License
+
+[Add your license here]
+
+---
+
+## 🔗 Related Repositories
+
+- **Application Repository**: [ratataque/terracloud](https://github.com/ratataque/terracloud)
+- **Azure Documentation**: [Azure App Service](https://docs.microsoft.com/azure/app-service/)
+- **Terraform Azure Provider**: [hashicorp/azurerm](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs)
