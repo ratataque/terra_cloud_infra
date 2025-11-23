@@ -77,8 +77,8 @@ jobs:
                   VM_IP=$(echo $VM_IPS | jq -r '.[0]')
                   DB_HOST=$(terragrunt output -raw database_host)
                   DB_DATABASE=$(terragrunt output -raw database_name)
-                  DB_USERNAME=$(terragrunt output -raw database_username)
-                  DB_PASSWORD=$(terragrunt output -raw database_password)
+                  DB_USERNAME=$(terragrunt output -raw database_admin_username)
+                  DB_PASSWORD=$(terragrunt output -raw database_admin_password)
                   APP_KEY=$(terragrunt output -raw app_key)
                   echo "::add-mask::$DB_PASSWORD"
                   echo "::add-mask::$APP_KEY"
@@ -129,11 +129,11 @@ jobs:
                   IMAGE_TAG: ${{ env.IMAGE_TAG }}
                   SSH_KEY_PATH: ~/.ssh/id_rsa
                   DB_CONNECTION: mysql
-                  DB_HOST: 10.0.2.4
+                  DB_HOST: ${{ steps.infra.outputs.db_host }}
                   DB_PORT: 3306
-                  DB_DATABASE: ${{ steps.infra.outputs.db_name }}
-                  DB_USERNAME: ${{ steps.infra.outputs.db_admin_username }}
-                  DB_PASSWORD: ${{ steps.infra.outputs.db_admin_password }}
+                  DB_DATABASE: ${{ steps.infra.outputs.db_database }}
+                  DB_USERNAME: ${{ steps.infra.outputs.db_username }}
+                  DB_PASSWORD: ${{ steps.infra.outputs.db_password }}
                   APP_KEY: ${{ steps.infra.outputs.app_key }}
               run: |
                   echo "🚀 Deploying with Docker Compose..."

@@ -23,7 +23,7 @@ output "subnet_id" {
 
 output "load_balancer_public_ip" {
   description = "The public IP address of the Load Balancer (null if LB disabled)"
-  value       = (
+  value = (
     var.enable_load_balancer && length(azurerm_public_ip.lb) > 0
     ? azurerm_public_ip.lb[0].ip_address
     : null
@@ -32,7 +32,7 @@ output "load_balancer_public_ip" {
 
 output "load_balancer_url" {
   description = "The URL to access the application via Load Balancer (null if LB disabled)"
-  value       = (
+  value = (
     var.enable_load_balancer && length(azurerm_public_ip.lb) > 0
     ? "http://${azurerm_public_ip.lb[0].ip_address}"
     : null
@@ -55,7 +55,7 @@ output "vm_private_ips" {
 
 output "vm_public_ips" {
   description = "The public IPs of the VMs when Load Balancer is disabled"
-  value       = (
+  value = (
     var.enable_load_balancer
     ? []
     : [for ip in azurerm_public_ip.vm : ip.ip_address]
@@ -85,3 +85,24 @@ output "database_name" {
   description = "The name of the database"
   value       = var.db_name
 }
+
+output "database_admin_username" {
+  description = "The database admin username"
+  value       = var.db_admin_username
+}
+
+output "database_admin_password" {
+  description = "The database admin password"
+  value       = var.db_admin_password
+}
+
+# ======================================================
+
+output "app_key" {
+  description = "Laravel application key"
+  value       = var.app_key
+}
+
+
+
+
