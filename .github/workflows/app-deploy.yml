@@ -129,11 +129,11 @@ jobs:
                   IMAGE_TAG: ${{ env.IMAGE_TAG }}
                   SSH_KEY_PATH: ~/.ssh/id_rsa
                   DB_CONNECTION: mysql
-                  DB_HOST: ${{ steps.infra.outputs.db_host }}
+                  DB_HOST: 10.0.2.4
                   DB_PORT: 3306
-                  DB_DATABASE: ${{ steps.infra.outputs.db_database }}
-                  DB_USERNAME: ${{ steps.infra.outputs.db_username }}
-                  DB_PASSWORD: ${{ steps.infra.outputs.db_password }}
+                  DB_DATABASE: ${{ steps.infra.outputs.db_name }}
+                  DB_USERNAME: ${{ steps.infra.outputs.db_admin_username }}
+                  DB_PASSWORD: ${{ steps.infra.outputs.db_admin_password }}
                   APP_KEY: ${{ steps.infra.outputs.app_key }}
               run: |
                   echo "🚀 Deploying with Docker Compose..."
