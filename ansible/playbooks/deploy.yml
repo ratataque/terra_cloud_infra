@@ -26,13 +26,10 @@
       #       enabled: yes
 
       - name: Log in to Azure Container Registry
-        command: >
-            az acr login --name {{ acr_name }}
-        environment:
-            AZURE_CLIENT_ID: "{{ lookup('env', 'AZURE_CLIENT_ID') }}"
-            AZURE_TENANT_ID: "{{ lookup('env', 'AZURE_TENANT_ID') }}"
-            AZURE_SUBSCRIPTION_ID: "{{ lookup('env', 'AZURE_SUBSCRIPTION_ID') }}"
-        changed_when: false
+        community.docker.docker_login:
+          registry: "{{ acr_name }}.azurecr.io"
+          username: "{{ lookup('env', 'ACR_USERNAME') }}"
+          password: "{{ lookup('env', 'ACR_PASSWORD') }}"
 
       - name: Main Deployment and Rollback Block
         block:

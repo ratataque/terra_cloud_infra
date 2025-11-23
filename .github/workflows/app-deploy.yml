@@ -75,13 +75,18 @@ jobs:
           VM_IPS=$(terragrunt output -json vm_public_ips)
           VM_IP=$(echo $VM_IPS | jq -r '.[0]')
           
-          echo "Getting ACR name from shared..."
+          echo "Getting shared infrastructure outputs..."
           cd ../../shared
           terragrunt init -reconfigure
           ACR_NAME=$(terragrunt output -raw acr_name)
+          ACR_USERNAME=$(terragrunt output -raw acr_admin_username)
+          ACR_PASSWORD=$(terragrunt output -raw acr_admin_password)
+          echo "::add-mask::$ACR_PASSWORD"
           
           echo "vm_ip=$VM_IP" >> $GITHUB_OUTPUT
           echo "acr_name=$ACR_NAME" >> $GITHUB_OUTPUT
+          echo "acr_username=$ACR_USERNAME" >> $GITHUB_OUTPUT
+          echo "acr_password=$ACR_PASSWORD" >> $GITHUB_OUTPUT
 
       - name: Setup Python
         uses: actions/setup-python@v4
@@ -91,6 +96,7 @@ jobs:
       - name: Install Ansible
         run: |
           pip install ansible docker
+          ansible-galaxy collection install community.docker
 
       - name: Setup SSH key
         run: |
@@ -105,6 +111,8 @@ jobs:
           qa_VM_IP: ${{ steps.infra.outputs.vm_ip }}
           prod_VM_IP: ${{ steps.infra.outputs.vm_ip }}
           ACR_NAME: ${{ steps.infra.outputs.acr_name }}
+          ACR_USERNAME: ${{ steps.infra.outputs.acr_username }}
+          ACR_PASSWORD: ${{ steps.infra.outputs.acr_password }}
           IMAGE_TAG: ${{ env.IMAGE_TAG }}
           SSH_KEY_PATH: ~/.ssh/id_rsa
           AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
