@@ -71,9 +71,17 @@ jobs:
                   echo "Initializing Terragrunt for ${{ env.ENV_NAME }}..."
                   terragrunt init -reconfigure
 
-                  # Get first VM public IP (array output)
+                  # Get IaaS outputs
+                  echo "Getting IaaS outputs..."
                   VM_IPS=$(terragrunt output -json vm_public_ips)
                   VM_IP=$(echo $VM_IPS | jq -r '.[0]')
+                  DB_HOST=$(terragrunt output -raw database_host)
+                  DB_DATABASE=$(terragrunt output -raw database_name)
+                  DB_USERNAME=$(terragrunt output -raw database_username)
+                  DB_PASSWORD=$(terragrunt output -raw database_password)
+                  APP_KEY=$(terragrunt output -raw app_key)
+                  echo "::add-mask::$DB_PASSWORD"
+                  echo "::add-mask::$APP_KEY"
 
                   echo "Getting shared infrastructure outputs..."
                   cd ../../shared
@@ -87,6 +95,11 @@ jobs:
                   echo "acr_name=$ACR_NAME" >> $GITHUB_OUTPUT
                   echo "acr_username=$ACR_USERNAME" >> $GITHUB_OUTPUT
                   echo "acr_password=$ACR_PASSWORD" >> $GITHUB_OUTPUT
+                  echo "db_host=$DB_HOST" >> $GITHUB_OUTPUT
+                  echo "db_database=$DB_DATABASE" >> $GITHUB_OUTPUT
+                  echo "db_username=$DB_USERNAME" >> $GITHUB_OUTPUT
+                  echo "db_password=$DB_PASSWORD" >> $GITHUB_OUTPUT
+                  echo "app_key=$APP_KEY" >> $GITHUB_OUTPUT
 
             - name: Setup Python
               uses: actions/setup-python@v4
@@ -115,19 +128,15 @@ jobs:
                   ACR_PASSWORD: ${{ steps.infra.outputs.acr_password }}
                   IMAGE_TAG: ${{ env.IMAGE_TAG }}
                   SSH_KEY_PATH: ~/.ssh/id_rsa
-                  AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-                  AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-                  AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
                   DB_CONNECTION: mysql
-                  DB_HOST: ${{ secrets.DB_HOST }}
-                  DB_PORT: ${{ secrets.DB_PORT }}
-                  DB_DATABASE: ${{ secrets.DB_DATABASE }}
-                  DB_USERNAME: ${{ secrets.DB_USERNAME }}
-                  DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
-                  APP_KEY: ${{ secrets.APP_KEY }}
+                  DB_HOST: ${{ steps.infra.outputs.db_host }}
+                  DB_PORT: 3306
+                  DB_DATABASE: ${{ steps.infra.outputs.db_database }}
+                  DB_USERNAME: ${{ steps.infra.outputs.db_username }}
+                  DB_PASSWORD: ${{ steps.infra.outputs.db_password }}
+                  APP_KEY: ${{ steps.infra.outputs.app_key }}
               run: |
-                  echo "🛑 Using stop-then-start deployment (no zero-downtime)"
-                  echo "Expected downtime: 10-30 seconds"
+                  echo "🚀 Deploying with Docker Compose..."
                   ansible-playbook -i inventories/${{ env.ENV_NAME }}.yml playbooks/deploy.yml -v
 
             - name: Deployment Summary

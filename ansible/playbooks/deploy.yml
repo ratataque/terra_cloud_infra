@@ -5,7 +5,7 @@
   become: yes
 
   vars:
-      container_name: "terracloud-app"
+      container_name: "app"
       app_port: 80
       health_check_retries: 10
       health_check_delay: 10
@@ -27,9 +27,9 @@
 
       - name: Log in to Azure Container Registry
         community.docker.docker_login:
-          registry: "{{ acr_name }}.azurecr.io"
-          username: "{{ lookup('env', 'ACR_USERNAME') }}"
-          password: "{{ lookup('env', 'ACR_PASSWORD') }}"
+            registry: "{{ acr_name }}.azurecr.io"
+            username: "{{ lookup('env', 'ACR_USERNAME') }}"
+            password: "{{ lookup('env', 'ACR_PASSWORD') }}"
 
       - name: Main Deployment and Rollback Block
         block:
@@ -67,8 +67,6 @@
                   image: "{{ acr_name }}.azurecr.io/app:{{ app_image_tag }}"
                   state: started
                   restart_policy: always
-                  ports:
-                      - "{{ app_port }}:80"
                   env:
                       APP_ENV: "{{ env_name }}"
                       DB_CONNECTION: "{{ lookup('env', 'DB_CONNECTION') | default('mysql') }}"
