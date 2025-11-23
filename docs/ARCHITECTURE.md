@@ -154,7 +154,13 @@ resource "azurerm_mysql_flexible_database" "main"
 | `vm_size` | string | VM SKU | `Standard_B1s` |
 | `mysql_sku` | string | MySQL SKU | `B_Standard_B1s` |
 | `admin_username` | string | VM admin user | `azureuser` |
-| `ssh_public_key` | string | SSH public key | - |
+| `ssh_public_key` | string | SSH public key | **Required via `SSH_PUBLIC_KEY` env var** |
+
+**⚠️ Local Deployment Requirement**: 
+```bash
+# Must export SSH_PUBLIC_KEY before terragrunt apply
+export SSH_PUBLIC_KEY=$(cat ~/.ssh/terracloud_deploy.pub)
+```
 
 **Outputs**:
 | Output | Description |

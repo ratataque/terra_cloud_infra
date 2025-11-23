@@ -81,8 +81,7 @@ terracloud-infra/
 │   ├── ARCHITECTURE.md             # Infrastructure architecture
 │   ├── WORKFLOWS.md                # CI/CD workflows
 │   ├── DEPLOYMENT.md               # Deployment guide
-│   ├── ANSIBLE.md                  # Ansible playbook docs
-│   └── TROUBLESHOOTING.md          # Common issues
+│   └── ANSIBLE.md                  # Ansible playbook docs
 │
 ├── terragrunt/
 │   ├── modules/                    # Terraform modules
@@ -133,25 +132,25 @@ terracloud-infra/
 ```
 ┌─────────────────────────────────────────────────────────┐
 │                    Shared Resources                     │
-│  ┌────────────────────────────────────────────────┐    │
-│  │  Azure Container Registry (ACR)                 │    │
-│  │  - Stores all Docker images                     │    │
-│  │  - Shared across all environments               │    │
-│  └────────────────────────────────────────────────┘    │
+│  ┌────────────────────────────────────────────────┐     │
+│  │  Azure Container Registry (ACR)                │     │
+│  │  - Stores all Docker images                    │     │
+│  │  - Shared across all environments              │     │
+│  └────────────────────────────────────────────────┘     │
 └─────────────────────────────────────────────────────────┘
                            │
-         ┌─────────────────┼─────────────────┐
-         │                 │                 │
-┌────────▼────────┐ ┌──────▼──────┐ ┌───────▼────────┐
-│   QA (IaaS)     │ │  QA (PaaS)  │ │  Prod (IaaS)   │
-│  ┌──────────┐   │ │ ┌─────────┐ │ │  ┌──────────┐  │
-│  │    VM    │   │ │ │App Svc. │ │ │  │    VM    │  │
-│  │ + Docker │   │ │ │(Docker) │ │ │  │ + Docker │  │
-│  └──────────┘   │ │ └─────────┘ │ │  └──────────┘  │
-│  ┌──────────┐   │ │ ┌─────────┐ │ │  ┌──────────┐  │
-│  │  MySQL   │   │ │ │  MySQL  │ │ │  │  MySQL   │  │
-│  └──────────┘   │ │ └─────────┘ │ │  └──────────┘  │
-└─────────────────┘ └─────────────┘ └────────────────┘
+         ┌─────────────────┼────────────────────────────────────┐
+         │                 │                 │                  │
+┌────────▼────────┐ ┌──────▼──────┐ ┌───────-▼───────┐ ┌───────-▼───────┐
+│   QA (IaaS)     │ │  QA (PaaS)  │ │  Prod (IaaS)   │ │  Prod (IaaS)   │
+│  ┌──────────┐   │ │ ┌─────────┐ │ │  ┌──────────┐  │ │  ┌──────────┐  │
+│  │    VM    │   │ │ │App Svc. │ │ │  │    VM    │  │ │  │    VM    │  │
+│  │ + Docker │   │ │ │(Docker) │ │ │  │ + Docker │  │ │  │ + Docker │  │
+│  └──────────┘   │ │ └─────────┘ │ │  └──────────┘  │ │  └──────────┘  │
+│  ┌──────────┐   │ │ ┌─────────┐ │ │  ┌──────────┐  │ │  ┌──────────┐  │
+│  │  MySQL   │   │ │ │  MySQL  │ │ │  │  MySQL   │  │ │  │  MySQL   │  │
+│  └──────────┘   │ │ └─────────┘ │ │  └──────────┘  │ │  └──────────┘  │
+└─────────────────┘ └─────────────┘ └────────────────┘ └────────────────┘
 ```
 
 ### Key Features
@@ -192,7 +191,17 @@ az account set --subscription "YOUR_SUBSCRIPTION_ID"
 # Run setup script (see docs/SETUP.md for details)
 ```
 
-### 3. Deploy Shared Infrastructure
+### 3. Set SSH Public Key (Required for local deployments)
+
+```bash
+# Generate SSH key if needed
+ssh-keygen -t rsa -b 4096 -C "terracloud-deploy" -f ~/.ssh/terracloud_deploy -N ""
+
+# Export public key (required for terragrunt apply)
+export SSH_PUBLIC_KEY=$(cat ~/.ssh/terracloud_deploy.pub)
+```
+
+### 4. Deploy Shared Infrastructure
 
 ```bash
 cd terragrunt/shared
@@ -200,15 +209,18 @@ terragrunt init
 terragrunt apply
 ```
 
-### 4. Deploy QA Environment
+### 5. Deploy QA Environment
 
 ```bash
+# Ensure SSH key is still exported
+export SSH_PUBLIC_KEY=$(cat ~/.ssh/terracloud_deploy.pub)
+
 cd terragrunt/iaas/qa
 terragrunt init
 terragrunt apply
 ```
 
-### 5. Deploy Application
+### 6. Deploy Application
 
 ```bash
 cd ansible
@@ -229,24 +241,26 @@ ansible-playbook -i inventories/qa.yml playbooks/deploy.yml
 
 ### Core Documentation
 
-| Document | Description |
-|----------|-------------|
-| [SETUP.md](docs/SETUP.md) | Complete initial setup guide with Azure OIDC, GitHub secrets, and first deployment |
-| [ARCHITECTURE.md](docs/ARCHITECTURE.md) | Infrastructure architecture, modules, and resource organization |
-| [WORKFLOWS.md](docs/WORKFLOWS.md) | CI/CD workflows explanation and usage |
-| [DEPLOYMENT.md](docs/DEPLOYMENT.md) | Application deployment guide (manual and automated) |
-| [ANSIBLE.md](docs/ANSIBLE.md) | Ansible playbook structure and customization |
-| [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | Common issues and solutions |
+| Document                                      | Description                                                                        |
+| --------------------------------------------- | ---------------------------------------------------------------------------------- |
+| [SETUP.md](docs/SETUP.md)                     | Complete initial setup guide with Azure OIDC, GitHub secrets, and first deployment |
+| [ARCHITECTURE.md](docs/ARCHITECTURE.md)       | Infrastructure architecture, modules, and resource organization                    |
+| [WORKFLOWS.md](docs/WORKFLOWS.md)             | CI/CD workflows explanation and usage                                              |
+| [DEPLOYMENT.md](docs/DEPLOYMENT.md)           | Application deployment guide (manual and automated)                                |
+| [ANSIBLE.md](docs/ANSIBLE.md)                 | Ansible playbook structure and customization                                       |
+| [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | Common issues and solutions                                                        |
 
 ### Quick Reference
 
 **Deploy infrastructure:**
+
 ```bash
 cd terragrunt/<iaas|paas>/<qa|prod>
 terragrunt apply
 ```
 
 **Deploy application:**
+
 ```bash
 # Via GitHub Actions
 gh workflow run app-deploy.yml -f environment=qa -f image_tag=1.2.3
@@ -257,6 +271,7 @@ ansible-playbook -i inventories/qa.yml playbooks/deploy.yml
 ```
 
 **View outputs:**
+
 ```bash
 cd terragrunt/iaas/qa
 terragrunt output
@@ -268,6 +283,10 @@ terragrunt output
 
 ### End-to-End Release Flow
 
+The deployment workflow differs between IaaS and PaaS deployments:
+
+#### IaaS Deployment (VM-based)
+
 ```
 1. Developer pushes to app repo (terracloud)
    ↓
@@ -275,7 +294,7 @@ terragrunt output
    ↓
 3. App CI: Trigger infra repo deployment (optional)
    ↓
-4. Ansible: Deploy v1.2.3 to QA
+4. Ansible: Deploy v1.2.3 to VMs
    - Pull image from ACR
    - Stop old container
    - Start new container
@@ -284,10 +303,41 @@ terragrunt output
    ↓
 5. QA Testing & Approval
    ↓
-6. Ansible: Promote v1.2.3 to Production
+6. Ansible: Promote v1.2.3 to Production VMs
    - Same image, no rebuild ✅
    - Requires approval
 ```
+
+#### PaaS Deployment (App Service-based)
+
+```
+1. Developer pushes to app repo (terracloud)
+   ↓
+2. App CI: Build image → Tag v1.2.3 → Push to ACR
+   ↓
+3. Azure App Service: Auto-deployment
+   - Detects new image in ACR
+   - Pulls image automatically
+   - Redeploys internally
+   - No Ansible required ✅
+   ↓
+4. QA Testing & Approval
+   ↓
+5. Production App Service: Auto-deployment
+   - Same automated process
+   - Azure handles container orchestration
+```
+
+### Key Differences
+
+| Aspect               | IaaS (VMs)                    | PaaS (App Service)            |
+| -------------------- | ----------------------------- | ----------------------------- |
+| **Deployment Tool**  | Ansible playbooks             | Azure auto-deployment         |
+| **Image Management** | Manual pull/start via Ansible | Automatic pull by Azure       |
+| **Health Checks**    | Custom Ansible tasks          | Built-in Azure health checks  |
+| **Rollback**         | Ansible rollback playbook     | Azure deployment slots        |
+| **Scaling**          | Manual VM scaling             | Automatic App Service scaling |
+| **Maintenance**      | OS patching required          | Fully managed by Azure        |
 
 See [docs/WORKFLOWS.md](docs/WORKFLOWS.md) for detailed workflow documentation.
 
@@ -311,22 +361,26 @@ See [docs/SETUP.md#security-configuration](docs/SETUP.md#security-configuration)
 ### Making Infrastructure Changes
 
 1. **Create feature branch**
+
    ```bash
    git checkout -b feature/add-key-vault
    ```
 
 2. **Modify Terraform modules**
+
    ```bash
    vim terragrunt/modules/azure-shared-infra/main.tf
    ```
 
 3. **Test locally**
+
    ```bash
    cd terragrunt/shared
    terragrunt plan
    ```
 
 4. **Create Pull Request**
+
    ```bash
    git add .
    git commit -m "feat: add Azure Key Vault for secrets"

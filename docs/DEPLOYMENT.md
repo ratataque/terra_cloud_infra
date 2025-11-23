@@ -173,8 +173,6 @@ ansible -i inventories/$ENV_NAME.yml all -m ping
 # }
 ```
 
-If connection fails, see [TROUBLESHOOTING.md](TROUBLESHOOTING.md#ssh-connection-issues).
-
 ### Step 4: Run Deployment Playbook
 
 ```bash
@@ -744,5 +742,4 @@ gh workflow run app-deploy.yml -f environment=prod -f image_tag=1.2.3
 ## Next Steps
 
 - **Ansible details**: See [ANSIBLE.md](ANSIBLE.md)
-- **Troubleshooting**: See [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
 - **Architecture**: See [ARCHITECTURE.md](ARCHITECTURE.md)

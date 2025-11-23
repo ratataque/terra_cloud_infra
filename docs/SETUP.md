@@ -304,7 +304,28 @@ remote_state {
 
 ## First Deployment
 
-### 1. Deploy Shared Infrastructure
+### 1. Set SSH Public Key Environment Variable
+
+**Required for local deployments** - Terragrunt needs your SSH public key to configure VM access:
+
+```bash
+# Generate SSH key if you haven't already
+ssh-keygen -t rsa -b 4096 \
+  -C "terracloud-deploy" \
+  -f ~/.ssh/terracloud_deploy \
+  -N ""
+
+# Export the public key (REQUIRED for terraform/terragrunt apply)
+export SSH_PUBLIC_KEY=$(cat ~/.ssh/terracloud_deploy.pub)
+
+# Verify it's set
+echo $SSH_PUBLIC_KEY
+# Should output: ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQ...
+```
+
+**⚠️ Important**: You must export `SSH_PUBLIC_KEY` before every `terragrunt apply` for IaaS environments in your terminal session.
+
+### 2. Deploy Shared Infrastructure
 
 The shared infrastructure includes the Azure Container Registry (ACR).
 
@@ -329,9 +350,17 @@ acr_login_server = "terracloudacr.azurecr.io"
 
 **Save the ACR name** - you'll need it for the application repository.
 
-### 2. Deploy QA IaaS Environment
+### 3. Deploy QA IaaS Environment
+
+**Ensure SSH_PUBLIC_KEY is still exported**:
 
 ```bash
+# Verify SSH key is set
+echo $SSH_PUBLIC_KEY
+
+# If empty, export it again
+export SSH_PUBLIC_KEY=$(cat ~/.ssh/terracloud_deploy.pub)
+
 cd terragrunt/iaas/qa
 
 # Initialize
@@ -361,9 +390,13 @@ terragrunt output
 - `database_host`: Use in GitHub Environment secrets
 - `database_name`: Use in GitHub Environment secrets
 
-### 3. Deploy Production IaaS Environment (Optional)
+### 4. Deploy Production IaaS Environment (Optional)
+
+**Ensure SSH_PUBLIC_KEY is exported**:
 
 ```bash
+export SSH_PUBLIC_KEY=$(cat ~/.ssh/terracloud_deploy.pub)
+
 cd terragrunt/iaas/prod
 
 terragrunt init
@@ -371,7 +404,7 @@ terragrunt plan
 terragrunt apply
 ```
 
-### 4. Deploy PaaS Environments (Optional)
+### 5. Deploy PaaS Environments (Optional)
 
 If you want to use App Service instead of VMs:
 
@@ -483,6 +516,24 @@ security_rule {
 ---
 
 ## Troubleshooting Setup
+
+### Issue: Missing SSH_PUBLIC_KEY
+
+**Error**: "Error: ssh_public_key is required"
+
+**Solution**:
+```bash
+# Generate SSH key if you haven't
+ssh-keygen -t rsa -b 4096 -C "terracloud-deploy" -f ~/.ssh/terracloud_deploy -N ""
+
+# Export the public key
+export SSH_PUBLIC_KEY=$(cat ~/.ssh/terracloud_deploy.pub)
+
+# Verify
+echo $SSH_PUBLIC_KEY
+
+# Then retry terraform/terragrunt apply
+```
 
 ### Issue: Terraform state lock
 

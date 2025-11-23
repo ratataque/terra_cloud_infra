@@ -703,14 +703,7 @@ Tasks should be safe to run multiple times:
 
 ---
 
-## Troubleshooting
-
-See [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for common Ansible issues and solutions.
-
----
-
 ## Next Steps
 
 - **Deploy application**: See [DEPLOYMENT.md](DEPLOYMENT.md)
-- **Troubleshooting**: See [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
 - **Workflows**: See [WORKFLOWS.md](WORKFLOWS.md)

@@ -756,4 +756,3 @@ gh run view <run-id> --log
 
 - **Deploy application**: See [DEPLOYMENT.md](DEPLOYMENT.md)
 - **Ansible details**: See [ANSIBLE.md](ANSIBLE.md)
-- **Troubleshooting**: See [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
