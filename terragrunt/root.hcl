@@ -1,14 +1,21 @@
 # Root Terragrunt Configuration for Azure PaaS
 locals {
+  # --- Robust Path Calculation ---
+  # Find the root of the git repo by looking for the .git folder.
+  repo_root = find_in_parent_folders(".git")
+
+  # Get the relative path from the repo root to the current terragrunt.hcl file.
+  # e.g., terragrunt/iaas/prod
+  path_from_root = path_relative(local.repo_root, get_terragrunt_dir())
+
+  # The key used in the storage_account_map, e.g., "iaas/prod"
+  map_key = replace(local.path_from_root, "terragrunt/", "")
+
+  # --- Original Logic (now using robust path) ---
   env         = basename(get_terragrunt_dir())
   region      = get_env("AZURE_REGION", "France Central")
-  
-  # Generate unique state path based on directory structure
-  # Examples: "shared", "iaas/prod", "paas/qa"
-  relative_path = replace(path_relative_from_repo_root(), "terragrunt/", "")
-  
+
   # Map each environment to its own storage account
-  # This ensures complete state isolation between environments
   storage_account_map = {
     "shared"    = "tfstatesharedcloud"
     "iaas/qa"   = "tfstateiaasqa"
@@ -18,8 +25,9 @@ locals {
   }
   
   # Get the storage account for this environment
-  storage_account_name = lookup(local.storage_account_map, local.relative_path, "terracloudtfstate")
+  storage_account_name = lookup(local.storage_account_map, local.map_key, "terracloudtfstate")
   
+  # --- The rest of the locals are unchanged ---
   # Project-wide configuration
   resource_group_name = "rg-stg_1"
   project_name        = "terracloud"
