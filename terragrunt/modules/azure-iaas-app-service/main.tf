@@ -245,14 +245,22 @@ resource "azurerm_linux_virtual_machine" "vm" {
   # Use custom image if provided, otherwise use marketplace image
   source_image_id = var.custom_image_id != "" ? var.custom_image_id : null
 
+  # This block specifies the Flatcar image from the Azure Marketplace
   dynamic "source_image_reference" {
     for_each = var.custom_image_id == "" ? [1] : []
     content {
-      publisher = "Canonical"
-      offer     = "0001-com-ubuntu-server-jammy"
-      sku       = "22_04-lts-gen2"
+      publisher = "kinvolk"
+      offer     = "flatcar-container-linux-free"
+      sku       = "stable"
       version   = "latest"
     }
+  }
+
+  # Essential: You must accept the marketplace terms once for this image
+  plan {
+    name      = "stable"
+    product   = "flatcar-container-linux-free"
+    publisher = "kinvolk"
   }
 
   admin_ssh_key {
