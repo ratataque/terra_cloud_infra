@@ -33,7 +33,7 @@ inputs = {
   ssh_public_key = get_env("SSH_PUBLIC_KEY", "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC... votre-cle-publique")
 
   # Use custom image with Docker pre-installed
-  custom_image_id = include.root.locals.custom_image_id
+  # custom_image_id = include.root.locals.custom_image_id
 
   # Reference shared ACR (t)
   acr_login_server    = dependency.shared.outputs.acr_login_server

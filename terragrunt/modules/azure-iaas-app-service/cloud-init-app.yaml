@@ -84,6 +84,8 @@ write_files:
 runcmd:
     - mkdir -p /opt/app
 
+    - sudo apt install -y docker.io docker-compose
+
     - usermod -aG docker azureuser
 
     - systemctl enable docker
