@@ -59,7 +59,7 @@ jobs:
                   owner: ratataque
                   repo: terra_cloud
                   github_token: ${{ secrets.APP_REPO_PAT }}
-                  workflow_file_name: build-and-push.yml
+                  workflow_file_name: ci.yml
                   ref: ${{ matrix.branch }}
                   wait_interval: 10
                   propagate_failure: true
